@@ -6,6 +6,7 @@ import time
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
+CRITICAL = 95
 WINDOWS = {"five_hour": "5-hour", "seven_day": "weekly", "primary": "5-hour", "secondary": "weekly"}
 
 
@@ -62,7 +63,7 @@ def _find(obj, key):
 
 
 class UsageWatch(QObject):
-    warn = Signal(str, str, float, object)      # source, window label, percent, resets_at
+    warn = Signal(str, str, float, object, bool)    # source, window label, percent, resets_at, critical
 
     def __init__(self, cfg):
         super().__init__()
@@ -73,7 +74,7 @@ class UsageWatch(QObject):
         QTimer.singleShot(8000, self.poll_codex)
 
     def poll_codex(self):
-        if not self.cfg.get("usage_warn"):
+        if not self.cfg.get("usage_warn") and not self.cfg.get("usage_critical"):
             return
         try:
             limits = codex_limits()
@@ -90,24 +91,26 @@ class UsageWatch(QObject):
     def check(self, source, limits):
         self.latest[source] = limits
         level = int(self.cfg.get("usage_warn") or 0)
-        if not level:
+        critical = CRITICAL if self.cfg.get("usage_critical", True) else 0
+        steps = sorted({s for s in (level, critical) if s})
+        if not steps:
             return
         warned = dict(self.cfg.get("usage_warned") or {})
         now = time.time()
         warned = {k: v for k, v in warned.items() if now - v < 8 * 86400}
         changed = False
         for key, (pct, resets) in limits.items():
-            for step in (level, 95):
-                if pct < step or (step == 95 and level >= 95):
-                    continue
-                tag = f"{source}:{key}:{step}:{resets or int(now // 86400)}"
-                if tag in warned:
-                    continue
-                warned[tag] = now
-                changed = True
-                if step == level and pct >= 95 and level < 95:
-                    warned[f"{source}:{key}:95:{resets or int(now // 86400)}"] = now
-                self.warn.emit(source, WINDOWS.get(key, key), pct, resets)
+            reached = [s for s in steps if pct >= s]
+            if not reached:
+                continue
+            window = resets or int(now // 86400)
+            tags = [f"{source}:{key}:{s}:{window}" for s in reached]
+            if all(t in warned for t in tags):
+                continue
+            for t in tags:
+                warned[t] = now
+            changed = True
+            self.warn.emit(source, WINDOWS.get(key, key), pct, resets, bool(critical and pct >= critical))
         if changed:
             self.cfg.set("usage_warned", warned)
 

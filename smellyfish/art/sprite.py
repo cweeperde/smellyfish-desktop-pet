@@ -179,11 +179,13 @@ class Pose:
         self.band = False
         self.flip = False
         self.parts = []
+        self.wear = []
         self.__dict__.update(kw)
 
     def but(self, **kw):
         p = Pose(**self.__dict__)
         p.parts = list(self.parts)
+        p.wear = list(self.wear)
         p.__dict__.update(kw)
         return p
 
@@ -252,6 +254,10 @@ def layers(p):
             out += [(ox + a, oy + b, "D" if i == len(pts) - 1 else "#") for i, (a, b) in enumerate(pts)]
         out += sprite_px(SIDE, ox, oy)
         out += [(ox + x, oy + y, "O") for x, y in eye_px(p, S_EYES)]
+        if p.band:
+            out += [(ox + x, oy + 2, "R") for x in range(2, 13)] + [(ox + 1, oy + 1, "R"), (ox, oy + 3, "R")]
+        if p.headset:
+            out += sprite_px(SIDE_HEADSET if p.headset == "mic" else SIDE_HEADPHONES, ox, oy - 1)
         out += [(ox + x, oy + y, "#") for x, y in S_ARM[p.arm]]
     else:
         ox, oy = BX + p.dx, BY + p.dy
@@ -281,11 +287,13 @@ def layers(p):
         out += [(ox + x, oy + y, "L") for x, y in F_ARMS[p.arm_f[0]]]
         out += [(ox + x, oy + y, "#") for x, y in F_ARMS[p.arm_f[1]]]
 
+    n_body = len(out)
+    for spr, x, y in p.wear:
+        out += sprite_px(spr, x, y)
     for spr, x, y in p.parts:
         out += sprite_px(spr, x, y)
     if p.tint:
         t = TINTS[p.tint]
-        n_body = len(out) - sum(len(sprite_px(spr, x, y)) for spr, x, y in p.parts)
         out = [(x, y, t.get(c, c)) if i < n_body else (x, y, c) for i, (x, y, c) in enumerate(out)]
     if p.lift:
         out = [(x, y + p.lift, c) for x, y, c in out]
@@ -693,6 +701,17 @@ HEADSET = [
     "..hhhR..........",
 ]
 HEADPHONES = HEADSET[:8]
+SIDE_HEADPHONES = [
+    "...hhhhhhh....",
+    "..h...........",
+    "..h...........",
+    "..h...........",
+    ".HHH..........",
+    ".HhH..........",
+    ".HhH..........",
+    ".HHH..........",
+]
+SIDE_HEADSET = SIDE_HEADPHONES + [".h............", "..hhhhR......."]
 MIC_MUTED = [
     "..WWW.R",
     "..WWWR.",
@@ -942,7 +961,7 @@ def with_outfit(p, outfit):
         return p
     rows = OUTFITS[outfit]
     oy = BY + p.dy + (1 if p.squash else 0) - len(rows) + 1 + p.lift
-    return p.but(parts=p.parts + [(rows, BX + p.dx, oy)])
+    return p.but(wear=p.wear + [(rows, BX + p.dx, oy)])
 
 
 # ---------------------------------------------------------------- focus timer, limits
@@ -1084,6 +1103,21 @@ WEATHER = {
 }
 
 
+def with_gear(p, headset=None, band=False, sweat=False):
+    """Things the pet keeps wearing whatever it does: call headset, music headphones, focus band, sweat."""
+    if p.cap:
+        return p
+    kw = {}
+    if headset and not p.headset:
+        kw["headset"] = headset
+    if band and not p.band:
+        kw["band"] = True
+    if sweat:
+        x = BX + p.dx + (0 if p.side else -1)
+        kw["wear"] = p.wear + [(["S", "S"], x, BY + p.dy + 2)]
+    return p.but(**kw) if kw else p
+
+
 def with_weather(p, kind):
     if not kind or p.side or p.cap or p.headset or p.band or kind not in WEATHER:
         return p
@@ -1091,7 +1125,7 @@ def with_weather(p, kind):
     if kind == "sun" and p.eyes not in ("open", "blink"):
         return p
     extra = [(rows, BX + p.dx + dx, oy + dy) for rows, dx, dy in WEATHER[kind]]
-    return p.but(parts=p.parts + extra)
+    return p.but(wear=p.wear + extra)
 
 
 # ---------------------------------------------------------------- reminders and weather moods
@@ -1312,11 +1346,11 @@ EGG = {"up": ["WWWW", "WYYW", ".WW."], "edge": ["WWWW"], "down": [".WW.", "WWWW"
 def _chef(p, pan_dy=0, egg=None, extra=()):
     oy = BY + p.dy + (1 if p.squash else 0) - len(CHEF_HAT) + 1 + p.lift
     px, py = BX + 15 + p.dx, BY + 6 + p.dy + pan_dy
-    parts = [(CHEF_HAT, BX + p.dx, oy), (PAN, px, py)]
+    parts = [(PAN, px, py)]
     if egg:
         kind, h = egg
         parts.append((EGG[kind], px + 5, py - len(EGG[kind]) - h))
-    return p.but(parts=p.parts + parts + list(extra))
+    return p.but(wear=p.wear + [(CHEF_HAT, BX + p.dx, oy)], parts=p.parts + parts + list(extra))
 
 
 def cooking():

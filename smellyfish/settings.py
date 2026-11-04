@@ -41,6 +41,7 @@ DEFAULTS = {
     "plant_watered_at": 0,
     "codex_hooks": False,
     "usage_warn": 80,
+    "usage_critical": True,
     "usage_warned": {},
     "trash_watch": True,
     "trash_gb": 2,

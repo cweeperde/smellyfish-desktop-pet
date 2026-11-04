@@ -56,6 +56,7 @@ SCHEMA = [
         ("codex_hooks", "Codex hooks (~/.codex/hooks.json)", None),
         ("task_timer", "Show how long a task is running", None),
         ("usage_warn", "Warn about usage limits", [("Off", 0), ("at 70 %", 70), ("at 80 %", 80), ("at 90 %", 90)]),
+        ("usage_critical", "Critical warning at 95 % of a limit", None),
         ("claude_statusline", "Claude usage via status line (~/.claude)", None),
     ]),
     ("Reactions", [
@@ -226,7 +227,8 @@ class SettingsWindow(QWidget):
 
         tools = QHBoxLayout()
         for text, fn in (("Animation tester...", app.open_gallery), ("Missed...", app.open_history),
-                         ("Achievements...", app.open_achievements), ("Discord setup...", app.open_discord_setup)):
+                         ("Achievements...", app.open_achievements), ("Discord setup...", app.open_discord_setup),
+                         ("Check for updates", lambda: app.updater.check(manual=True))):
             b = QPushButton(text)
             b.setObjectName("secondary")
             b.clicked.connect(fn)

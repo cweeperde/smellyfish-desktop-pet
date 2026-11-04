@@ -2,9 +2,9 @@
 import os
 
 from PIL import Image, ImageDraw, ImageFont
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QAbstractSlider, QAbstractSpinBox, QApplication, QComboBox, QLabel, QScrollArea, QScrollBar
 
 from smellyfish.art import sprite
 from smellyfish.paths import HOME_DIR
@@ -98,7 +98,29 @@ def stylesheet():
             .replace("UP_PNG", _icon("up", up, (5, 3))))
 
 
+class _NoWheel(QObject):
+    """Dropdowns, number fields and sliders ignore the mouse wheel (no accidental changes);
+    the wheel scrolls the page instead."""
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Wheel and isinstance(obj, (QComboBox, QAbstractSpinBox, QAbstractSlider))                 and not isinstance(obj, QScrollBar):
+            w = obj.parent()
+            while w is not None and not isinstance(w, QScrollArea):
+                w = w.parent()
+            if w is not None:
+                QApplication.sendEvent(w.verticalScrollBar(), event)
+            return True
+        return False
+
+
+_no_wheel = None
+
+
 def apply(widget, app):
+    global _no_wheel
+    if _no_wheel is None and QApplication.instance() is not None:
+        _no_wheel = _NoWheel()
+        QApplication.instance().installEventFilter(_no_wheel)
     widget.setStyleSheet(stylesheet())
     widget.setWindowIcon(app.tray_icon())
 

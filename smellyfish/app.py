@@ -81,6 +81,14 @@ def fmt_elapsed(sec, short=False):
     return f"{sec // 3600}h{(sec % 3600) // 60}m" if short else f"{sec // 3600}h {(sec % 3600) // 60}m"
 
 
+ONCE_PRIO = {
+    "alarm": 90, "warn": 85, "error": 80, "reminder": 75, "angry": 70, "dizzy": 65, "trophy": 60,
+    "trash_full": 55, "sweep": 55, "water": 55, "land": 5,
+    "tickled": 45, "petted": 45, "happy": 40, "sad": 40, "nom": 40, "snack": 40, "camera": 40, "shy": 35,
+    "hello": 30, "bye": 30, "stretch": 25,
+    "look_around": 10, "bubbles": 10, "read": 10, "sneeze": 10, "yawn": 10,
+    "sunny": 15, "rainy": 15, "snowy": 15, "shiver": 15, "cloudy": 15,
+}
 ROAM_BASES = {"idle", "music", "call", "call_muted", "call_deaf", "hot", "offline", "battery_low",
               "working", "thinking", "search", "terminal", "browse", "todo", "cooking"}
 ANIM_SOUNDS = {"tickled": "giggle", "petted": "purr", "sweep": "sweep", "water": "splash", "nom": "munch",
@@ -301,12 +309,20 @@ class Player(QObject):
             self.timer.stop()
             self.leave()
 
-    def once(self, name):
+    def once(self, name, force=False):
+        """Play a one-shot reaction. It never interrupts physics and only replaces a running reaction
+        that is not more important (see ONCE_PRIO)."""
+        if not force:
+            if self.mode == "force":
+                return False
+            if self.mode == "once" and ONCE_PRIO.get(name, 30) < ONCE_PRIO.get(self.name, 30):
+                return False
         if getattr(self, "on_once_start", None):
             self.on_once_start(name)
         self.timer.stop()
         self.mode = "once"
         self.start(name)
+        return True
 
     def force(self, name):
         if self.mode == "force" and self.name == name:
@@ -317,9 +333,9 @@ class Player(QObject):
 
     def release(self, then=None):
         self.timer.stop()
+        self.mode = "base"
         if then:
             return self.once(then)
-        self.mode = "base"
         self.start(self.base)
 
     def beat(self):
@@ -650,11 +666,14 @@ class Smellyfish(QObject):
         weather = self.weather.kind if self.cfg["weather"] else None
         carry = self.carrying and not pose.side
         skin = self.skin_key()
-        key = (id(pose), ex, ey, outfit, flip, weather, carry, skin)
+        gear = self.gear()
+        key = (id(pose), ex, ey, outfit, flip, weather, carry, skin, gear)
         if key not in self.cache:
             p = pose.but(ex=ex, ey=ey) if (ex or ey) else pose
             if flip:
                 p = p.but(flip=True)
+            if gear != (None, False, False):
+                p = sprite.with_gear(p, *gear)
             p = sprite.with_outfit(p, outfit)
             p = sprite.with_weather(p, weather)
             if carry:
@@ -667,6 +686,21 @@ class Smellyfish(QObject):
             if len(self.cache) > 2000:
                 self.cache.clear()
         self.view.set_frame(*self.cache[key])
+
+    def gear(self):
+        """What the pet keeps wearing whatever it is doing: (headset, band, sweat)."""
+        name = self.player.name
+        if self.cfg["dnd"] or name in ("sleeping", "peek") or self.cfg.get("mini"):
+            return None, False, False
+        d = self.discord.state
+        headset = None
+        if self.cfg["discord"] and d["in_call"]:
+            headset = "mic"
+        elif self.music_on():
+            headset = "phones"
+        band = self.focus.phase == "focus"
+        sweat = bool(self.cfg["react_cpu"] and self.monitor.hot and name != "hot")
+        return headset, band, sweat
 
     def skin_key(self):
         return self.cfg.get("skin"), self.cfg.get("skin_color")
@@ -697,7 +731,7 @@ class Smellyfish(QObject):
 
     def preview_anim(self, name):
         if name and not self.hanging and self.phys == "rest":
-            self.player.once(name)
+            self.player.once(name, force=True)
 
     # ------------------------------------------------------------ mood & achievements
     def bump(self, stat, n=1):
@@ -2249,13 +2283,14 @@ class Smellyfish(QObject):
                 self.set_info({"kind": "wait", "chip": "Usage limit" if limited else "Error", "right": right,
                                "text": text})
                 self.notify_sound("question")
-                if limited:
+                if self.interactive:
+                    pass
+                elif limited:
                     self.player.set_base("exhausted")
                     self.limit_timer.start(LIMIT_MS)
                 else:
-                    self.player.set_base(self.idle_base())
-                    if not self.player.busy:
-                        self.player.once("error")
+                    self.player.set_base(self.after_task_base())
+                    self.player.once("error")
             else:
                 text = summarize(payload.get("last_assistant_message")) or f"{who} is done."
                 self.add_history(who, "Done", text)
@@ -2267,13 +2302,15 @@ class Smellyfish(QObject):
                 if self.cfg["done_bubble"]:
                     self.set_info({"kind": "done", "chip": "Done", "right": right, "text": text})
                 self.notify_sound("done")
-                self.player.set_base("done")
+                if not self.interactive:
+                    self.player.set_base("done")
             self.done_timer.start(DONE_MS)
         elif ev in ("SessionEnd", "Interrupt"):
             self.drop_session(sid)
             self.set_info(None)
             self.quiet.stop()
-            self.player.set_base(self.idle_base())
+            if not self.interactive:
+                self.player.set_base(self.after_task_base())
 
     def quiet_event(self, payload, ev, who):
         """Do not disturb / fullscreen: no animation changes, only the badge and the missed list."""
@@ -2295,7 +2332,13 @@ class Smellyfish(QObject):
         if self.info and self.info.get("kind") in ("done", "wait"):
             self.set_info(None)
         if not self.interactive and self.player.base == "done":
-            self.player.set_base(self.idle_base())
+            self.player.set_base(self.after_task_base())
+
+    def after_task_base(self):
+        """Another task still running keeps the pet thinking instead of going idle."""
+        now = time.time()
+        busy = any(now - self.sessions.get(sid, 0) < 600 for sid in self.prompt_time)
+        return "thinking" if busy else self.idle_base()
 
     def on_limit_over(self):
         if self.player.base == "exhausted":
@@ -2806,7 +2849,7 @@ class Smellyfish(QObject):
                        "buttons": [("Restart", "update_restart", True), ("Later", "ok", False)]})
 
     # ------------------------------------------------------------ usage limits
-    def on_usage_warn(self, source, window, pct, resets):
+    def on_usage_warn(self, source, window, pct, resets, critical=False):
         when = ""
         try:
             if isinstance(resets, (int, float)):
@@ -2821,14 +2864,22 @@ class Smellyfish(QObject):
         except Exception:
             pass
         text = f"{pct:.0f} % of your {window} {source} limit is used.{when}"
+        chip = "Limit almost reached!" if critical else "Usage"
+        if critical:
+            text += " Wrap up or save your work soon."
         if self.quiet_mode():
-            return self.missed(source, "Usage", text)
-        self.add_history(source, "Usage", text)
+            return self.missed(source, chip, text)
+        self.add_history(source, chip, text)
         if self.interactive:
             return
-        self.set_info({"kind": "wait", "chip": "Usage", "right": source, "text": text})
-        self.done_timer.start(DONE_MS)
-        self.notify_sound("warn")
+        self.set_info({"kind": "critical" if critical else "wait", "chip": chip, "right": source, "text": text,
+                       "critical": critical})
+        if critical:
+            self.done_timer.stop()
+            self.notify_sound("alarm")
+        else:
+            self.done_timer.start(DONE_MS)
+            self.notify_sound("warn")
         self.player.once("warn")
 
     # ------------------------------------------------------------ recycle bin

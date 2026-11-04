@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import threading
+import urllib.error
 import urllib.request
 
 from PySide6.QtCore import QObject, QTimer, Signal
@@ -103,6 +104,10 @@ class Updater(QObject):
                 raise
             self.installed = tag.lstrip("vV")
             self.ready.emit(self.installed)
+        except urllib.error.HTTPError as e:
+            if manual:
+                self.status.emit("No published release found yet." if e.code == 404 else
+                                 f"Could not check for updates (HTTP {e.code}).")
         except Exception as e:
             if manual:
                 self.status.emit(f"Could not check for updates ({e.__class__.__name__}).")
