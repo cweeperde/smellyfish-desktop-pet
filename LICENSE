@@ -1,0 +1,39 @@
+Smellyfish - Proprietary Source-Available License
+
+Copyright (c) 2026 cweeper. All rights reserved.
+
+The source code, artwork, sprites, animations, sounds, user interface designs,
+the name "Smellyfish" and its logo (together, the "Software") are the exclusive
+property of the copyright holder.
+
+The Software is published in this repository only so that people can read and
+review the source code and verify what the program does.
+
+1. Permitted
+   a) Viewing and reading the source code, including through GitHub's own
+      features (browsing and forking as required by the GitHub Terms of Service).
+   b) Downloading the official release builds published in this repository and
+      running them on your own computers for personal, non-commercial use.
+
+2. Not permitted without prior written permission from the copyright holder
+   a) Copying, reproducing or redistributing the Software or any part of it,
+      in source or binary form.
+   b) Modifying the Software or creating derivative works, including reusing
+      the artwork, sprites, animations, sounds or designs in other projects.
+   c) Selling, sublicensing, renting or otherwise commercially exploiting the
+      Software.
+   d) Using the name "Smellyfish" or its logo for other products.
+
+3. No other rights are granted, whether by implication, estoppel or otherwise.
+
+4. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+Smellyfish is an independent project and is not affiliated with, endorsed by or
+sponsored by Anthropic, OpenAI, Discord or any other company whose products it
+works with. All product names belong to their respective owners.
+
+For permission requests, open an issue in this repository.

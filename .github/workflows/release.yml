@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Check version
+        shell: bash
+        run: |
+          v=$(python -c "import smellyfish; print(smellyfish.__version__)")
+          test "v$v" = "${GITHUB_REF_NAME}" || { echo "Tag ${GITHUB_REF_NAME} does not match version $v"; exit 1; }
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build
+        run: python tools/build_exe.py
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Smellyfish.exe
+          generate_release_notes: true

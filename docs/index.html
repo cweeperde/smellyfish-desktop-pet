@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smellyfish - a pixel jellyfish for your desktop</title>
+<meta name="description" content="A tiny pixel-art jellyfish that lives on your Windows desktop and keeps an eye on Claude Code, Codex and your PC.">
+<link rel="icon" href="media/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #221634; --bg: #15111f; --panel: #2a2438; --paper: #f6f0fc; --lav: #c492ec; --light: #e2c0fa;
+  --dark: #8c60be; --deep: #5a3d80; --text: #f2ecfa; --muted: #a898c0; --yellow: #ffd250; --green: #82e696;
+  --red: #eb505a;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; color: var(--text); font: 15px/1.6 "JetBrains Mono", Consolas, monospace; background: var(--bg);
+  background-image:
+    radial-gradient(circle at 75% 12%, rgba(196,146,236,.22), transparent 38%),
+    radial-gradient(circle at 12% 70%, rgba(140,96,190,.18), transparent 40%),
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: auto, auto, 32px 32px, 32px 32px; background-attachment: fixed;
+  padding-bottom: 80px; image-rendering: pixelated;
+}
+a { color: var(--light); }
+img { image-rendering: pixelated; max-width: 100%; display: block; }
+main { max-width: 980px; margin: 0 auto; padding: 56px 16px 40px; display: grid; gap: 56px; }
+
+.win {
+  background: var(--panel); border: 3px solid var(--dark); box-shadow: 8px 8px 0 rgba(8,6,14,.7);
+  border-top-color: var(--light); border-left-color: var(--light); border-bottom-color: var(--deep);
+  border-right-color: var(--deep);
+}
+.win.paper { background: var(--paper); color: var(--ink); }
+.bar {
+  display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: var(--deep);
+  font: 700 13px "Silkscreen", monospace; color: var(--text); letter-spacing: .5px;
+}
+.bar .dot { width: 10px; height: 10px; background: var(--light); }
+.bar .btns { margin-left: auto; display: flex; gap: 6px; }
+.bar .btns span { width: 14px; height: 14px; border: 2px solid var(--light); display: grid; place-items: center;
+  font-size: 9px; line-height: 1; }
+.body { padding: 26px 30px 30px; }
+.tilt-l { transform: rotate(-1.2deg); }
+.tilt-r { transform: rotate(1deg); }
+
+.kicker { font: 700 13px "Silkscreen", monospace; color: var(--dark); letter-spacing: 2px; margin: 0 0 6px; }
+h1 { font: 700 clamp(44px, 11vw, 104px)/0.95 "Silkscreen", monospace; margin: 4px 0 18px; letter-spacing: -2px; }
+h1 .accent { color: var(--dark); }
+h1 .ext { color: var(--lav); font-size: .55em; }
+h2 { font: 700 26px "Silkscreen", monospace; margin: 0 0 14px; color: var(--light); }
+.hero { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; }
+.hero .pet { width: 272px; max-width: none; animation: bob 2.6s steps(6) infinite; }
+@keyframes bob { 50% { transform: translateY(-10px); } }
+.prompt {
+  margin: 22px 0; background: var(--ink); color: var(--light); padding: 12px 16px; font-weight: 600;
+  border: 3px solid #0d0916;
+}
+.prompt::after { content: "\2588"; animation: blink 1s steps(1) infinite; margin-left: 6px; }
+@keyframes blink { 50% { opacity: 0; } }
+.actions { display: flex; flex-wrap: wrap; gap: 14px; }
+.btn {
+  display: inline-block; padding: 12px 22px; font: 700 14px "Silkscreen", monospace; text-decoration: none;
+  color: var(--ink); background: var(--lav); border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+  transition: transform .08s, box-shadow .08s;
+}
+.btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--ink); }
+.btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink); }
+.btn.ghost { background: var(--paper); }
+
+.shot { border: 3px solid #0d0916; }
+.caption { color: var(--muted); font-size: 13px; margin-top: 10px; }
+
+.log { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.log li { background: #1d1828; border: 3px solid var(--deep); padding: 14px 16px; }
+.log b { display: block; font: 700 15px "Silkscreen", monospace; color: var(--lav); margin-bottom: 4px; }
+.log span { color: var(--muted); font-size: 13px; }
+
+.watch { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center; }
+.status { display: grid; gap: 10px; }
+.status div { display: flex; align-items: center; gap: 12px; background: #1d1828; border-left: 6px solid var(--lav);
+  padding: 8px 12px; font-size: 14px; }
+.status i { font-style: normal; color: var(--yellow); font-weight: 800; min-width: 22px; text-align: center; }
+
+.steps { counter-reset: s; list-style: none; padding: 0; margin: 0 0 22px; display: grid; gap: 10px; }
+.steps li { counter-increment: s; display: flex; gap: 14px; align-items: baseline; }
+.steps li::before { content: counter(s); font: 700 14px "Silkscreen", monospace; background: var(--lav);
+  color: var(--ink); padding: 2px 9px; }
+.trust { color: var(--muted); font-size: 13px; border-top: 3px dashed var(--deep); padding-top: 16px; margin-top: 22px; }
+footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16px; }
+
+.taskbar {
+  position: fixed; left: 0; right: 0; bottom: 0; height: 52px; display: flex; align-items: center; gap: 8px;
+  padding: 0 10px; background: #100c18; border-top: 3px solid var(--deep); z-index: 10; overflow-x: auto;
+}
+.taskbar a {
+  font: 700 12px "Silkscreen", monospace; color: var(--muted); text-decoration: none; padding: 7px 12px;
+  border: 2px solid #2a2438; background: #1d1828; white-space: nowrap; display: flex; align-items: center; gap: 8px;
+}
+.taskbar a.active, .taskbar a:hover { color: var(--text); border-color: var(--lav); background: var(--panel); }
+.taskbar img { width: 18px; }
+.clock { margin-left: auto; font: 700 13px "Silkscreen", monospace; color: var(--yellow); padding: 7px 12px;
+  border: 2px solid #2a2438; white-space: nowrap; }
+
+@media (max-width: 720px) {
+  .hero, .watch { grid-template-columns: 1fr; }
+  .hero .pet { width: 150px; justify-self: center; grid-row: 1; }
+  .log { grid-template-columns: 1fr; }
+  .body { padding: 20px 18px 22px; }
+  .tilt-l, .tilt-r { transform: none; }
+  .taskbar a:not(:first-child) { display: none; }
+}
+</style>
+</head>
+<body>
+<main>
+  <section id="top" class="win paper tilt-l">
+    <div class="bar"><span class="dot"></span>c:\smellyfish\readme.md<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
+    <div class="body hero">
+      <div>
+        <p class="kicker">Desktop pet // Windows 10 &middot; 11</p>
+        <h1>SMELLY<span class="accent">FISH</span><span class="ext">.exe</span></h1>
+        <p>A tiny pixel jellyfish that floats around your desktop, sits on your windows and keeps an eye on
+          Claude Code, Codex and your PC. It answers questions in little speech bubbles, cooks up your code and
+          naps in its own bed when there's nothing to do.</p>
+        <div class="prompt">&gt; Smellyfish.exe</div>
+        <div class="actions">
+          <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest">Download</a>
+          <a class="btn ghost" href="https://github.com/cweeperde/smellyfish-desktop-pet">Source code</a>
+        </div>
+      </div>
+      <img class="pet" src="media/hero.gif" alt="Smellyfish">
+    </div>
+  </section>
+
+  <section id="demo" class="win tilt-r">
+    <div class="bar"><span class="dot"></span>desktop.gif<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
+    <div class="body">
+      <img class="shot" src="media/desktop.gif" alt="Smellyfish on a desktop, asking a question in a speech bubble">
+      <p class="caption">// sits on your editor, asks before it acts, goes home to bed afterwards.</p>
+    </div>
+  </section>
+
+  <section id="tricks" class="win">
+    <div class="bar"><span class="dot"></span>tricks.log<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
+    <div class="body">
+      <h2>What it gets up to</h2>
+      <ul class="log">
+        <li><b>window hopping</b><span>sits on visible window edges, jumps between them and climbs their sides</span></li>
+        <li><b>grab &amp; throw</b><span>dangles from a tentacle, swings, flies, lands with a squish</span></li>
+        <li><b>a home</b><span>lamp for do-not-disturb, a bed, a plant that tells you the weather</span></li>
+        <li><b>pc reactions</b><span>busy CPU, music, Discord calls, full recycle bin, games in fullscreen</span></li>
+        <li><b>head pats</b><span>pet its head or tickle its tentacles with your cursor</span></li>
+        <li><b>toys &amp; trophies</b><span>a ball to fetch, fish snacks, focus timer and achievements</span></li>
+      </ul>
+      <img class="shot" style="margin-top:22px" src="media/animations.gif" alt="Animation overview">
+    </div>
+  </section>
+
+  <section id="watch" class="win tilt-l">
+    <div class="bar"><span class="dot"></span>claude_codex.sys<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
+    <div class="body watch">
+      <div>
+        <h2>Your coding buddy</h2>
+        <p>Switch on the integration and the jellyfish shows what Claude Code or Codex is doing, how long it
+          has been at it, and pings you when it's done or needs you. Questions and permission prompts can be
+          answered right from the bubble.</p>
+        <div class="status">
+          <div><i>?</i>searching the code with a magnifier</div>
+          <div><i>&gt;_</i>running a command in its terminal</div>
+          <div><i>~</i>cooking with a chef hat and a pan</div>
+          <div><i>!</i>warns before your usage limit runs out</div>
+        </div>
+      </div>
+      <img src="media/bubbles.png" alt="Speech bubbles">
+    </div>
+  </section>
+
+  <section id="extras" class="win tilt-r">
+    <div class="bar"><span class="dot"></span>helpers.gif<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
+    <div class="body">
+      <h2>Little helpers</h2>
+      <p>Discord mute and deafen status, messages, the weather at its plant, a focus timer, usage warnings,
+        a nudge when the recycle bin overflows, achievements and reminders.</p>
+      <img class="shot" src="media/features.gif" alt="Discord status, weather, focus timer, usage limits, recycle bin, achievements, task timer and reminders">
+    </div>
+  </section>
+
+  <section id="get" class="win paper tilt-l">
+    <div class="bar"><span class="dot"></span>download.txt<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
+    <div class="body">
+      <h2 style="color:var(--ink)">Get it</h2>
+      <ol class="steps">
+        <li>Download <b>Smellyfish.exe</b> from the latest release.</li>
+        <li>Run it. One portable file, nothing to install.</li>
+        <li>Right-click it in the tray to open the settings.</li>
+      </ol>
+      <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest">Download latest &rarr;</a>
+      <p class="trust">Talks to Claude Code and Codex only on your own PC (127.0.0.1). Hooks are only added
+        when you switch them on. Updates come from this repository's releases and are checked before they are
+        installed.</p>
+    </div>
+  </section>
+</main>
+<footer>&copy; 2026 cweeper &middot; Smellyfish is an independent project, not affiliated with Anthropic, OpenAI or Discord.</footer>
+
+<nav class="taskbar">
+  <a href="#top" class="active"><img src="media/icon.png" alt="">smellyfish.exe</a>
+  <a href="#demo">desktop.gif</a>
+  <a href="#tricks">tricks.log</a>
+  <a href="#watch">claude_codex.sys</a>
+  <a href="#extras">helpers.gif</a>
+  <a href="#get">download</a>
+  <span class="clock" id="clock"></span>
+</nav>
+<script>
+const clock = document.getElementById("clock");
+const tick = () => { clock.textContent = new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"}); };
+tick(); setInterval(tick, 1000);
+const links = [...document.querySelectorAll(".taskbar a")];
+const obs = new IntersectionObserver(es => es.forEach(e => {
+  if (e.isIntersecting) links.forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#" + e.target.id));
+}), {threshold: 0.5});
+document.querySelectorAll("main section").forEach(s => obs.observe(s));
+</script>
+</body>
+</html>
