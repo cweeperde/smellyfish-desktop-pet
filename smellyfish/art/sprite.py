@@ -960,7 +960,7 @@ def with_outfit(p, outfit):
     if not outfit or p.side or p.cap or p.headset or p.band:
         return p
     rows = OUTFITS[outfit]
-    oy = BY + p.dy + (1 if p.squash else 0) - len(rows) + 1 + p.lift
+    oy = BY + p.dy + (1 if p.squash else 0) - len(rows) + 1
     return p.but(wear=p.wear + [(rows, BX + p.dx, oy)])
 
 
@@ -1118,13 +1118,26 @@ def with_gear(p, headset=None, band=False, sweat=False):
     return p.but(**kw) if kw else p
 
 
+SCARF_SIDE = [".RWRWRWRWRWRW.", "RR............", "WR............", ".R............"]
+WEATHER_SIDE = {
+    "rain": WEATHER["rain"],
+    "cold": [(SCARF_SIDE, 1, 7)],
+    "snow": [(SCARF_SIDE, 1, 7), WEATHER["snow"][1]],
+}
+
+
 def with_weather(p, kind):
-    if not kind or p.side or p.cap or p.headset or p.band or kind not in WEATHER:
+    """Weather clothes (umbrella, sunglasses, scarf). They go with headphones and the focus band too;
+    only the sleeping cap replaces them."""
+    if not kind or p.cap:
         return p
-    oy = BY + p.dy + (1 if p.squash else 0) + p.lift
-    if kind == "sun" and p.eyes not in ("open", "blink"):
+    table = WEATHER_SIDE if p.side else WEATHER
+    if kind not in table:
         return p
-    extra = [(rows, BX + p.dx + dx, oy + dy) for rows, dx, dy in WEATHER[kind]]
+    if kind == "sun" and (p.eyes not in ("open", "blink") or p.headset == "mic"):
+        return p
+    oy = BY + p.dy + (1 if p.squash else 0)
+    extra = [(rows, BX + p.dx + dx, oy + dy) for rows, dx, dy in table[kind]]
     return p.but(wear=p.wear + extra)
 
 
@@ -1344,7 +1357,7 @@ EGG = {"up": ["WWWW", "WYYW", ".WW."], "edge": ["WWWW"], "down": [".WW.", "WWWW"
 
 
 def _chef(p, pan_dy=0, egg=None, extra=()):
-    oy = BY + p.dy + (1 if p.squash else 0) - len(CHEF_HAT) + 1 + p.lift
+    oy = BY + p.dy + (1 if p.squash else 0) - len(CHEF_HAT) + 1
     px, py = BX + 15 + p.dx, BY + 6 + p.dy + pan_dy
     parts = [(PAN, px, py)]
     if egg:
