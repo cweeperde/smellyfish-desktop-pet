@@ -1,26 +1,38 @@
-"""Mood, statistics and achievements (all persisted in the settings)."""
+"""Statistics and achievements (persisted in the settings)."""
 import time
 
 ACHIEVEMENTS = [
-    ("first_task", "First task", "Claude or Codex finished a task", "tasks_done", 1),
-    ("task_10", "Busy bee", "10 finished tasks", "tasks_done", 10),
-    ("task_100", "Workhorse", "100 finished tasks", "tasks_done", 100),
-    ("codex_first", "Polyglot", "Codex finished a task", "codex_done", 1),
+    ("first_task", "First task", "Your AI agent finished a task", "tasks_done", 1),
+    ("task_10", "Busy bee", "10 finished AI tasks", "tasks_done", 10),
+    ("task_100", "Workhorse", "100 finished AI tasks", "tasks_done", 100),
     ("answers_10", "Good listener", "Answered 10 questions in a bubble", "answered", 10),
-    ("snacks_10", "Well fed", "Fed 10 snacks", "snacks", 10),
-    ("pokes_100", "Poke master", "Poked it 100 times", "pokes", 100),
-    ("throws_25", "Frequent flyer", "Threw it 25 times", "throws", 25),
-    ("plant_10", "Green thumb", "Watered the plant 10 times", "watered", 10),
-    ("focus_5", "Deep work", "Finished 5 focus rounds", "focus_rounds", 5),
-    ("climb_10", "Mountaineer", "Climbed 10 windows", "climbs", 10),
-    ("fetch_20", "Good fetch", "Fetched the ball 20 times", "fetches", 20),
-    ("photo_10", "Paparazzi", "Took 10 screenshots", "screenshots", 10),
     ("days_7", "Old friends", "Spent 7 days together", "days", 7),
+    ("days_30", "Best friends", "Spent 30 days together", "days", 30),
+    ("pokes_100", "Poke master", "Poked it 100 times", "pokes", 100),
+    ("pokes_500", "Boop overload", "Booped it 500 times. It remembers.", "pokes", 500),
     ("angry_1", "Oops", "Made it really angry", "angry", 1),
-    ("night_owl", "Night owl", "Still working after 2 am", "night_owl", 1),
+    ("dizzy_5", "Spin cycle", "Made it dizzy 5 times", "dizzy", 5),
+    ("throws_25", "Frequent flyer", "Threw it 25 times", "throws", 25),
+    ("yeet_1", "YEET", "Threw it really, really fast", "yeets", 1),
+    ("fall_1", "Butterfingers", "Dropped it from way up high", "big_falls", 1),
+    ("climb_10", "Mountaineer", "It climbed 10 windows", "climbs", 10),
     ("tickle_10", "Giggles", "Tickled its tentacles 10 times", "tickles", 10),
+    ("tickle_50", "Tickle monster", "Tickled it 50 times. Please let it breathe.", "tickles", 50),
     ("pet_10", "Head pats", "Petted it 10 times", "pets", 10),
+    ("snacks_10", "Well fed", "Fed 10 snacks", "snacks", 10),
+    ("snacks_50", "Bottomless", "Fed 50 snacks. Where does it put them?", "snacks", 50),
+    ("fetch_20", "Good fetch", "Fetched the ball 20 times", "fetches", 20),
+    ("plant_10", "Green thumb", "Watered the plant 10 times", "watered", 10),
+    ("weather_10", "Weather nerd", "Checked the weather 10 times", "weather_checks", 10),
+    ("photo_10", "Paparazzi", "Took 10 screenshots", "screenshots", 10),
     ("trash_1", "Clean desk", "Emptied the recycle bin", "trash_emptied", 1),
+    ("trash_5", "Neat freak", "Emptied the recycle bin 5 times", "trash_emptied", 5),
+    ("focus_5", "Deep work", "Finished 5 focus rounds", "focus_rounds", 5),
+    ("breaks_10", "Hydrated", "Took 10 breaks when it asked", "breaks", 10),
+    ("night_owl", "Night owl", "Still at the computer after 2 am", "night_owl", 1),
+    ("clicks_1k", "Warming up", "1,000 clicks and key presses", "clicks", 1000),
+    ("clicks_100k", "Clicky fingers", "100,000 clicks and key presses", "clicks", 100000),
+    ("clicks_day", "Keyboard warrior", "10,000 clicks and key presses in one day", "best_day_clicks", 10000),
 ]
 
 
@@ -29,10 +41,6 @@ class Life:
         self.cfg = cfg
         self.stats = dict(cfg.get("stats") or {})
         self.unlocked = dict(cfg.get("achievements") or {})
-        self.mood = float(cfg.get("mood") if cfg.get("mood") is not None else 70)
-        self.snack_times = []
-        self._decay_from = float(cfg.get("mood_at") or time.time())
-        self.decay()
         today = time.strftime("%Y-%m-%d")
         if self.stats.get("last_day") != today:
             self.stats["last_day"] = today
@@ -42,22 +50,11 @@ class Life:
     def save(self):
         self.cfg["stats"] = self.stats
         self.cfg["achievements"] = self.unlocked
-        self.cfg["mood"] = round(self.mood, 1)
-        self.cfg["mood_at"] = self._decay_from
         self.cfg.save()
 
-    def decay(self):
-        """Mood slowly drops (1 point per 10 minutes) towards 20."""
-        now = time.time()
-        steps = int((now - self._decay_from) // 600)
-        if steps > 0:
-            self.mood = max(20.0, self.mood - steps)
-            self._decay_from += steps * 600
-            self.save()
-
-    def change_mood(self, delta):
-        self.mood = max(0.0, min(100.0, self.mood + delta))
-        self.save()
+    def unlocked_count(self):
+        known = {a[0] for a in ACHIEVEMENTS}
+        return sum(1 for aid in self.unlocked if aid in known)
 
     def bump(self, stat, n=1):
         """Count something; returns achievements that were just unlocked."""
@@ -69,15 +66,3 @@ class Life:
                 new.append((title, desc))
         self.save()
         return new
-
-    def feed(self):
-        """True if it was hungry enough to enjoy the snack."""
-        now = time.time()
-        self.snack_times = [t for t in self.snack_times if now - t < 3600] + [now]
-        enjoyed = len(self.snack_times) <= 5
-        self.change_mood(15 if enjoyed else 2)
-        return enjoyed
-
-    def mood_label(self):
-        m = self.mood
-        return "happy" if m >= 75 else "content" if m >= 45 else "a bit sad" if m >= 25 else "sad"

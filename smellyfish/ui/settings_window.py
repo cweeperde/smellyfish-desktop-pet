@@ -3,7 +3,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QCheckBox, QColorDialog, QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
-                               QKeySequenceEdit, QLabel, QLineEdit, QPushButton, QScrollArea, QSlider, QSpinBox,
+                               QKeySequenceEdit, QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea, QSlider, QSpinBox,
                                QVBoxLayout, QWidget)
 
 from smellyfish import __version__
@@ -70,6 +70,8 @@ SCHEMA = [
         ("react_hover", "Blush when you hover over it", None),
         ("react_clipboard", "React to copying and screenshots", None),
         ("trash_watch", "Remind me of a full recycle bin", None),
+        ("clicker", "Count my clicks and key presses (only the number)", None),
+        ("break_nudge", "Suggest a short break after 75 minutes", None),
     ]),
     ("Music, games & Discord", [
         ("react_music", "Dance to music (Spotify / any audio)", None),
@@ -105,6 +107,7 @@ class SettingsWindow(QWidget):
         theme.apply(self, app)
         self.resize(1180, 860)
         self.widgets = {}
+        self.pending = {}
         self._loading = True
 
         outer = QVBoxLayout(self)
@@ -130,12 +133,11 @@ class SettingsWindow(QWidget):
                     slider = QSlider(Qt.Horizontal)
                     slider.setRange(0, 100)
                     value_label = QLabel("")
-                    slider.valueChanged.connect(lambda v, lb=value_label: lb.setText(f"{v} %"))
-                    slider.sliderReleased.connect(lambda k=key, sl=slider: self.changed(k, sl.value()))
+                    slider.valueChanged.connect(lambda v, lb=value_label, k=key: (lb.setText(f"{v} %"),
+                                                                                  self.changed(k, v)))
                     test = QPushButton("Test")
                     test.setObjectName("secondary")
-                    test.clicked.connect(lambda _c=False, k=key, sl=slider: (self.changed(k, sl.value()),
-                                                                           app.test_sound(k)))
+                    test.clicked.connect(lambda _c=False, k=key, sl=slider: app.test_sound(k, sl.value()))
                     row.addWidget(slider, 1)
                     row.addWidget(value_label)
                     row.addWidget(test)
@@ -218,7 +220,7 @@ class SettingsWindow(QWidget):
         wl.addWidget(QLabel("Place"))
         self.place = QLineEdit()
         self.place.setPlaceholderText("e.g. Berlin")
-        self.place.editingFinished.connect(lambda: self.changed("weather_place", self.place.text().strip()))
+        self.place.textEdited.connect(lambda t: self.changed("weather_place", t.strip()))
         wl.addWidget(self.place, 1)
         self.weather_status = QLabel(app.weather.text)
         self.weather_status.setObjectName("hint")
@@ -237,18 +239,30 @@ class SettingsWindow(QWidget):
 
         buttons = QHBoxLayout()
         buttons.setContentsMargins(12, 0, 12, 0)
-        for text, fn, primary in (("Set home here", app.set_home_here, False), ("Go home", app.go_home, False),
-                                  ("Close", self.close, True)):
+        for text, fn in (("Set home here", app.set_home_here), ("Go home", app.go_home)):
             b = QPushButton(text)
-            if not primary:
-                b.setObjectName("secondary")
+            b.setObjectName("secondary")
             b.clicked.connect(fn)
             buttons.addWidget(b)
+        self.save_status = QLabel("")
+        self.save_status.setObjectName("hint")
+        buttons.addWidget(self.save_status, 1, Qt.AlignRight)
+        cancel = QPushButton("Cancel")
+        cancel.setObjectName("secondary")
+        cancel.clicked.connect(self.cancel)
+        buttons.addWidget(cancel)
+        self.save_button = QPushButton("Save")
+        self.save_button.clicked.connect(self.save)
+        buttons.addWidget(self.save_button)
         outer.addLayout(buttons)
         self.refresh()
 
     def refresh(self):
+        if self.pending and self.isVisible():
+            return
         self._loading = True
+        self.pending = {}
+        self.update_status()
         for key, (slider, value_label) in self.sliders.items():
             slider.setValue(int(self.app.get_setting(key) or 0))
             value_label.setText(f"{slider.value()} %")
@@ -271,8 +285,11 @@ class SettingsWindow(QWidget):
     def pick_color(self):
         color = QColorDialog.getColor(QColor(self.app.get_setting("skin_color") or "#c492ec"), self, "Jellyfish color")
         if color.isValid():
-            self.app.apply_setting("skin_color", color.name())
-            self.app.apply_setting("skin", "custom")
+            self.changed("skin_color", color.name())
+            self._loading = True
+            self.widgets["skin"].setCurrentIndex(self.widgets["skin"].findData("custom"))
+            self._loading = False
+            self.changed("skin", "custom")
 
     def set_weather_status(self, text):
         self.weather_status.setText(text)
@@ -288,8 +305,45 @@ class SettingsWindow(QWidget):
         if self._loading:
             return
         mapping = {a: e.keySequence().toString(QKeySequence.PortableText) for a, e in self.key_edits.items()}
-        self.app.apply_setting("hotkeys", mapping)
+        self.changed("hotkeys", mapping)
 
     def changed(self, key, value):
-        if not self._loading and value is not None:
-            self.app.apply_setting(key, value)
+        if self._loading or value is None:
+            return
+        if value == self.app.get_setting(key):
+            self.pending.pop(key, None)
+        else:
+            self.pending[key] = value
+        self.update_status()
+
+    def update_status(self):
+        n = len(self.pending)
+        self.save_status.setText(f"{n} unsaved change{'s' if n != 1 else ''}" if n else "")
+        self.save_button.setEnabled(bool(n))
+        self.setWindowTitle("Smellyfish Settings" + (" *" if n else ""))
+
+    def save(self):
+        changes, self.pending = dict(self.pending), {}
+        for key in sorted(changes, key=lambda k: k != "skin_color"):
+            self.app.apply_setting(key, changes[key])
+        problems = self.app.verify_saved([k for k in changes if k not in ("hooks", "codex_hooks", "autostart",
+                                                                           "claude_statusline")])
+        self.refresh()
+        self.save_status.setText("Could not save: " + problems if problems else "Saved")
+
+    def cancel(self):
+        self.pending = {}
+        self.close()
+
+    def closeEvent(self, e):
+        if self.pending:
+            box = QMessageBox(QMessageBox.Question, "Unsaved changes", "Save your changes before closing?",
+                              QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, self)
+            theme.apply(box, self.app)
+            answer = box.exec()
+            if answer == QMessageBox.Cancel:
+                return e.ignore()
+            if answer == QMessageBox.Save:
+                self.save()
+            self.pending = {}
+        e.accept()

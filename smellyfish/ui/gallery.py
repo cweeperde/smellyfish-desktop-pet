@@ -14,7 +14,8 @@ CATEGORIES = [
     ("Claude & Codex", ["thinking", "working", "question", "done", "error", "exhausted", "warn"]),
     ("Tools", ["search", "terminal", "browse", "todo", "cooking"]),
     ("Moods", ["happy", "sad", "angry", "shy", "dizzy", "hello", "bye", "yawn", "tickled", "petted"]),
-    ("Idle", ["idle", "look_around", "bubbles", "read", "sneeze", "sleeping", "stretch"]),
+    ("Idle", ["idle", "look_around", "bubbles", "read", "sneeze", "sleeping", "stretch", "yoyo", "juggle", "tea",
+              "gaming", "paper_plane", "bubblegum", "doodle"]),
     ("PC & apps", ["hot", "battery_low", "charging", "offline", "music", "call", "call_muted", "call_deaf", "mail",
                    "focus", "alarm"]),
     ("Home & moving", ["water", "swim", "climb", "land", "fall", "held", "peek"]),
@@ -299,8 +300,8 @@ class AchievementsWindow(QWidget):
         self.resize(520, 620)
         root = QVBoxLayout(self)
         root.addWidget(theme.banner("Achievements", "Collect them all"))
-        self.mood = QLabel("")
-        root.addWidget(self.mood)
+        self.summary = QLabel("")
+        root.addWidget(self.summary)
         self.list = QListWidget()
         root.addWidget(self.list, 1)
         close = QPushButton("Close")
@@ -310,8 +311,7 @@ class AchievementsWindow(QWidget):
     def refresh(self):
         from smellyfish.features.life import ACHIEVEMENTS
         life = self.app.life
-        self.mood.setText(f"Mood: {life.mood_label()} ({round(life.mood)}/100)   "
-                          f"Unlocked: {len(life.unlocked)}/{len(ACHIEVEMENTS)}")
+        self.summary.setText(f"Unlocked: {life.unlocked_count()}/{len(ACHIEVEMENTS)}")
         self.list.clear()
         for aid, title, desc, key, need in ACHIEVEMENTS:
             have = life.stats.get(key, 0)

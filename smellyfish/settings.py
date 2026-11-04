@@ -1,11 +1,14 @@
 """Persistent user settings and Windows autostart."""
 import contextlib
 import json
+import logging
 import os
 import sys
 import time
 
 from smellyfish.paths import HOME_DIR as DIR, pet_command
+
+log = logging.getLogger("smellyfish.settings")
 
 PATH = os.path.join(DIR, "settings.json")
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -61,6 +64,8 @@ DEFAULTS = {
     "volume": 60,
     "notify_volume": 70,
     "auto_update": True,
+    "clicker": False,
+    "break_nudge": True,
     "temp_unit": "C",
     "seasonal": True,
     "auto_water": True,
@@ -80,8 +85,6 @@ DEFAULTS = {
     "task_timer": True,
     "talk_blips": True,
     "reminders": [],
-    "mood": None,
-    "mood_at": None,
     "stats": {},
     "achievements": {},
 }
@@ -98,14 +101,29 @@ class Settings(dict):
         super().__init__(DEFAULTS)
         self._dirty = set()
         self.readonly = False
+        self.on_error = None
         if os.path.exists(PATH):
-            try:
-                with open(PATH, encoding="utf-8") as f:
-                    data = json.load(f)
+            data, error = None, None
+            for _ in range(40):
+                try:
+                    with open(PATH, encoding="utf-8") as f:
+                        data = json.load(f)
+                    break
+                except OSError as e:
+                    error = e
+                    time.sleep(0.05)
+                except ValueError as e:
+                    error = e
+                    break
+            if data is not None:
                 dict.update(self, {k: v for k, v in data.items() if k in DEFAULTS})
                 self._backup()
-            except (OSError, ValueError):
+            elif isinstance(error, ValueError):
+                log.warning("settings.json is damaged (%s), restoring from a backup", error)
                 self._recover()
+            else:
+                log.error("settings.json could not be read (%s); using a backup, file left untouched", error)
+                self._load_backup()
 
     def _backup(self):
         for i in (3, 2):
@@ -125,24 +143,39 @@ class Settings(dict):
             os.replace(PATH, os.path.join(DIR, f"settings.broken-{int(time.time())}.json"))
         except OSError:
             self.readonly = True
+        if self._load_backup():
+            self._dirty = {k for k in DEFAULTS if k in self}
+
+    def _load_backup(self):
         for i in (1, 2, 3):
             try:
                 with open(f"{PATH}.bak{i}", encoding="utf-8") as f:
                     data = json.load(f)
                 dict.update(self, {k: v for k, v in data.items() if k in DEFAULTS})
-                self._dirty = set(data) & set(DEFAULTS)
-                return
+                return True
             except (OSError, ValueError):
                 continue
+        return False
 
     def __setitem__(self, key, value):
         super().__setitem__(key, value)
         self._dirty.add(key)
 
     def save(self):
-        """Merge only the keys changed here into the file, under a lock shared by all processes."""
+        """Merge only the keys changed here into the file, under a lock shared by all processes.
+        Returns True on success; on failure the changes stay pending and are retried by the next save."""
         if self.readonly:
-            return
+            return False
+        try:
+            self._save()
+            return True
+        except Exception as e:
+            log.exception("saving settings failed")
+            if self.on_error:
+                self.on_error(e)
+            return False
+
+    def _save(self):
         os.makedirs(DIR, exist_ok=True)
         with _file_lock(PATH + ".lock"):
             disk = {}

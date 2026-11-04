@@ -47,10 +47,22 @@ def claude_entry(matcher, timeout):
     return e
 
 
+def _bare(path):
+    """A path that needs no quotes, so the same command works in PowerShell and cmd."""
+    if " " not in path or os.name != "nt":
+        return path
+    import ctypes
+    buf = ctypes.create_unicode_buffer(1024)
+    if ctypes.windll.kernel32.GetShortPathNameW(path, buf, 1024):
+        return buf.value
+    return path
+
+
 def codex_entry(timeout):
     exe, args = relay_command()
     cmd = " ".join(f'"{p}"' for p in [exe] + args + ["codex"])
-    return {"hooks": [{"type": "command", "command": cmd, "commandWindows": cmd, "timeout": timeout}]}
+    win = " ".join([_bare(exe)] + [_bare(a) for a in args] + ["codex"])
+    return {"hooks": [{"type": "command", "command": cmd, "commandWindows": win, "timeout": min(timeout, 600)}]}
 
 
 def ours(e):
@@ -80,11 +92,16 @@ def is_installed(scope="user"):
 
 
 def needs_update(scope):
-    exe, _ = relay_command()
-    want = exe.replace("\\", "/").lower()
-    data = load(target(scope))
-    mine = [e for entries in data.get("hooks", {}).values() for e in entries if ours(e)]
-    return any(want not in json.dumps(e).replace("\\\\", "/").lower() for e in mine)
+    data = load(target(scope)).get("hooks", {})
+    if scope == "codex":
+        wanted = {ev: codex_entry(t) for ev, t in CODEX_EVENTS.items()}
+    else:
+        wanted = {ev: claude_entry(m, t) for ev, (m, t) in CLAUDE_EVENTS.items()}
+    for ev, entry in wanted.items():
+        mine = [e for e in data.get(ev, []) if ours(e)]
+        if mine and mine != [entry]:
+            return True
+    return False
 
 
 def apply(scope, install=True):

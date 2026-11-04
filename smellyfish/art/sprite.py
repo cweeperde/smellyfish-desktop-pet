@@ -1376,14 +1376,145 @@ def cooking():
     return {"intro": intro, "loop": loop, "outro": [(Pose(eyes="happy"), 180), (Pose(), 120)]}
 
 
+# ---------------------------------------------------------------- more idle fun
+YOYO = [".R.", "RWR", ".R."]
+
+
+def yoyo():
+    hold = Pose(arm_f=("rest_l", "up_r"), ex=1)
+    loop = []
+    for t, length in enumerate((1, 3, 6, 9, 11, 9, 6, 3, 1, 1, 4, 8, 11, 8, 4, 1)):
+        string = [(["q"] * length, BX + 17, BY + 1)] if length else []
+        loop.append((hold.but(ey=1 if length > 6 else 0, eyes="happy" if t in (15,) else "open",
+                              parts=string + [(YOYO, BX + 16, BY + 1 + length)]), 90))
+    return {"intro": [(hold.but(parts=[(YOYO, BX + 16, BY + 2)]), 200)] + loop,
+            "loop": [], "outro": [(Pose(eyes="happy"), 220)]}
+
+
+def juggle():
+    balls = [(["RR", "RR"]), (["YY", "YY"]), (["BB", "BB"])]
+    arc = [(BX + 1, BY - 1), (BX + 3, BY - 5), (BX + 7, BY - 8), (BX + 11, BY - 5), (BX + 13, BY - 1),
+           (BX + 9, BY - 3), (BX + 5, BY - 3)]
+    intro = []
+    for t in range(21):
+        parts = [(balls[k], *arc[(t + k * 2) % len(arc)]) for k in range(3)]
+        arms = ("up_l", "rest_r") if t % 2 == 0 else ("rest_l", "up_r")
+        intro.append((Pose(arm_f=arms, ey=-1, dy=-(t % 4 == 1), parts=parts), 110))
+    intro.append((Pose(eyes="happy", blush=True, arm_f=("up_l", "up_r")), 360))
+    return {"intro": intro, "loop": []}
+
+
+CUP = ["......", "WWWW..", "WttWWW", "WttW.W", "WttWW.", ".WW..."]
+
+
+def tea():
+    steam = lambda t, x, y: [(STEAM[t % 2], x + 1, y - 3)]
+    held = Pose(arm_f=("rest_l", "up_r"))
+    intro = [(held.but(parts=[(CUP, BX + 15, BY + 3)] + steam(0, BX + 15, BY + 3)), 400),
+             (held.but(parts=[(CUP, BX + 15, BY + 3)] + steam(1, BX + 15, BY + 3)), 400),
+             (held.but(ex=1, parts=[(CUP, BX + 13, BY + 3)]), 160),
+             (held.but(eyes="sleep", blush=True, parts=[(CUP, BX + 11, BY + 3)]), 700),
+             (held.but(eyes="sleep", blush=True, dy=-1, parts=[(CUP, BX + 11, BY + 2)]), 500),
+             (held.but(eyes="happy", blush=True, parts=[(CUP, BX + 15, BY + 3)] + steam(0, BX + 15, BY + 3)), 600),
+             (held.but(eyes="happy", blush=True, parts=[(CUP, BX + 15, BY + 3)] + steam(1, BX + 15, BY + 3)), 500)]
+    return {"intro": intro, "loop": [], "outro": [(Pose(eyes="happy"), 200)]}
+
+
+def _console(t, win=False):
+    rows = ["HHHHHHHHHHH", "HnnnnnnnnnH", "HnnnnnnnnnH", "HnnnnnnnnnH", "HHHHHHHHHHH", "HRHHHHHHYHH"]
+    rows = [list(r) for r in rows]
+    if win:
+        for x in range(3, 8):
+            rows[2][x] = "Y"
+    else:
+        rows[3][1 + (t % 9)] = "c"
+        rows[1 + (t // 3) % 3][9 - (t % 9)] = "X"
+    return ["".join(r) for r in rows]
+
+
+def gaming():
+    play = Pose(arm_f=("up_l", "up_r"), ey=1, tent="tuck")
+    intro = [(play.but(parts=[(_console(0), BX + 2, BY + 7)]), 250)]
+    for t in range(18):
+        intro.append((play.but(dy=-(t % 6 == 3), eyes="wide" if t in (8, 9) else "open",
+                               parts=[(_console(t), BX + 2, BY + 7)]), 120))
+    intro.append((play.but(eyes="happy", blush=True, parts=[(_console(0, True), BX + 2, BY + 7),
+                                                             (STAR, BX + 17, BY - 2)]), 500))
+    return {"intro": intro, "loop": [], "outro": [(Pose(eyes="happy"), 200)]}
+
+
+PLANE = ["W....", "WWW..", "WWWWW", "..ww."]
+
+
+def paper_plane():
+    intro = [(Pose(arm_f=("rest_l", "up_r"), parts=[(PLANE, BX + 16, BY + 2)]), 300),
+             (Pose(arm_f=("rest_l", "rest_r"), ex=1, parts=[(PLANE, BX + 17, BY + 4)]), 220),
+             (Pose(arm_f=("rest_l", "up_r"), ex=1, ey=-1, dy=-1, parts=[(PLANE, BX + 18, BY + 1)]), 110)]
+    for k, (x, y) in enumerate(((21, 0), (24, -2), (26, -4), (28, -5), (29, -7))):
+        intro.append((Pose(ex=1, ey=-1, parts=[(PLANE, BX + x - 4, BY + y)]), 110))
+    intro += [(Pose(ex=1, ey=-1), 400), (Pose(eyes="happy", blush=True, arm_f=("up_l", "up_r")), 450)]
+    return {"intro": intro, "loop": []}
+
+
+def _gum(r):
+    size = 2 * r + 1
+    out = []
+    for y in range(size):
+        row = ""
+        for x in range(size):
+            d = ((x - r) ** 2 + (y - r) ** 2) ** 0.5
+            row += "P" if r - 0.6 <= d <= r + 0.4 else ("p" if d < r - 0.6 else ".")
+        out.append(row)
+    if r >= 2:
+        out[1] = out[1][:1] + "W" + out[1][2:]
+    return out
+
+
+def bubblegum():
+    intro = [(Pose(ey=1), 250)]
+    for r in (1, 1, 2, 2, 3, 3, 4):
+        intro.append((Pose(eyes="sleep" if r < 4 else "open", parts=[(_gum(r), BX + 8 - r, BY + 7 - r)]), 200))
+    pop = [(["p.p.p"], BX + 6, BY + 5), (["p...p"], BX + 6, BY + 7), ([".p.p."], BX + 5, BY + 9)]
+    intro += [(Pose(eyes="wide", dy=-1, parts=pop), 160), (Pose(eyes="x", blush=True, parts=pop[:2]), 260),
+              (Pose(eyes="blink", blush=True), 200), (Pose(eyes="happy", blush=True), 400)]
+    return {"intro": intro, "loop": []}
+
+
+PAD = ["WWWWWWW", "WwwwwwW", "WWWWWWW", "WwwwwwW", "WWWWWWW", "WWWWWWW"]
+
+
+def doodle():
+    held = Pose(arm_f=("rest_l", "up_r"), ex=1, ey=1)
+    heart = [".P.P.", "PPPPP", ".PPP.", "..P.."]
+    intro = []
+    for t in range(12):
+        pad = [list(r) for r in PAD]
+        for k in range(min(t, 6)):
+            pad[1 + (k % 4)][1 + k % 5] = "R"
+        intro.append((held.but(parts=[(["".join(r) for r in pad], BX + 15, BY + 4),
+                                      (["Y", "Y", "q"], BX + 17 + (t % 3), BY + 1 + t % 2)]), 130))
+    intro.append((Pose(eyes="happy", blush=True, arm_f=("rest_l", "up_r"),
+                       parts=[(PAD, BX + 15, BY + 2), (heart, BX + 16, BY + 3)]), 700))
+    return {"intro": intro, "loop": []}
+
+
 # ---------------------------------------------------------------- hanging by a tentacle (drag)
 GRAB_X, GRAB_LEN = 6, 7
 
 
-def hang_image(phase, pal=None):
-    """Upside-down pet held by one tentacle. Returns (1x RGBA image, pivot (x, y))."""
+def clothing_px(dressed):
+    """Pixels a dressed front pose adds to the plain body, relative to the body origin."""
+    plain = {(x, y): c for x, y, c in layers(Pose())}
+    worn = {(x, y): c for x, y, c in layers(dressed)}
+    return [(x - BX, y - BY, c) for (x, y), c in worn.items() if plain.get((x, y)) != c]
+
+
+def hang_image(phase, pal=None, dressed=None):
+    """Upside-down pet held by one tentacle, keeping its clothes. Returns (1x RGBA image, pivot (x, y))."""
     from PIL import Image
-    w, h = 18, 9 + GRAB_LEN
+    clothes = clothing_px(dressed) if dressed is not None else []
+    below = max([0] + [-y for _x, y, _c in clothes])
+    w, h = 18, 9 + GRAB_LEN + below
     px = []
     px += sprite_px(FRONT, 1, 0)
     for k, x in enumerate(F_TENT):
@@ -1397,9 +1528,12 @@ def hang_image(phase, pal=None):
     px += [(1 + x, y, "O") for x, y in eyes]
     arm_y = (3, 5)[phase % 2]
     px += [(0, arm_y, "L"), (16, 8 - arm_y, "#")]
+    px += [(1 + x, y, c) for x, y, c in clothes if 0 <= 1 + x < w]
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    colors = dict(PAL, **pal) if pal else PAL
     for x, y, c in px:
-        img.putpixel((x, h - 1 - y), (dict(PAL, **pal) if pal else PAL)[c] + (255,))
+        if 0 <= h - 1 - below - y < h:
+            img.putpixel((x, h - 1 - below - y), colors[c] + (255,))
     return img, (1 + GRAB_X, 0)
 
 
@@ -1436,7 +1570,8 @@ ANIMATIONS = {"idle": idle, "working": working, "thinking": thinking, "question"
               "sunny": sunny, "snowy": snowy, "shiver": shiver, "cloudy": cloudy,
               "search": search, "terminal": terminal, "browse": browse, "todo": todo, "tickled": tickled,
               "petted": petted, "trash_full": trash_full, "sweep": sweep, "warn": warn,
-              "cooking": cooking}
+              "cooking": cooking, "yoyo": yoyo, "juggle": juggle, "tea": tea, "gaming": gaming,
+              "paper_plane": paper_plane, "bubblegum": bubblegum, "doodle": doodle}
 
 
 def build_all():
