@@ -3196,7 +3196,19 @@ def already_running():
         return False
 
 
+def boot_note(text):
+    """Tiny log in %TEMP% written before anything else, to see why a start ended early."""
+    try:
+        import tempfile
+        with open(os.path.join(tempfile.gettempdir(), "smellyfish-boot.log"), "a", encoding="utf-8") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} pid {os.getpid()} {text}" + chr(10))
+    except OSError:
+        pass
+
+
 def main():
+    boot_note(f"boot exe={sys.executable} cwd={os.getcwd()} home={paths.HOME_DIR} "
+              f"env_home={os.environ.get('SMELLYFISH_HOME')!r} args={sys.argv[1:]}")
     if "--relay" in sys.argv:
         from smellyfish.integrations import hook_relay
         sys.argv = [sys.argv[0]] + [a for a in sys.argv[1:] if a != "--relay"]
@@ -3207,16 +3219,21 @@ def main():
             if not already_running():
                 break
             time.sleep(0.25)
-    if already_running():
-        print("Smellyfish is already running.")
+    for _ in range(24):
+        if not already_running():
+            break
+        time.sleep(0.25)
+    else:
+        boot_note("exit: another Smellyfish answers on the port")
         return 0
     for _ in range(40):
         if hold_instance_lock():
             break
         time.sleep(0.25)
     else:
-        print("Smellyfish is already running (profile locked).")
+        boot_note("exit: profile is locked by another Smellyfish")
         return 0
+    boot_note("running")
     from smellyfish import logs
     logs.setup()
     import logging
