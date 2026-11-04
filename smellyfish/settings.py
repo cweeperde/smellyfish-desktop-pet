@@ -118,6 +118,8 @@ class Settings(dict):
             if data is not None:
                 dict.update(self, {k: v for k, v in data.items() if k in DEFAULTS})
                 self._backup()
+                log.info("loaded settings (house %s, %d achievements)", self.get("show_house"),
+                         len(self.get("achievements") or {}))
             elif isinstance(error, ValueError):
                 log.warning("settings.json is damaged (%s), restoring from a backup", error)
                 self._recover()
@@ -197,6 +199,7 @@ class Settings(dict):
                     time.sleep(0.02)
             else:
                 os.replace(tmp, PATH)
+            log.info("saved %s (pid %s)", ", ".join(sorted(self._dirty)) or "-", os.getpid())
             self._dirty.clear()
             for k, v in merged.items():
                 dict.__setitem__(self, k, v)

@@ -174,6 +174,7 @@ class Interactive:
         self.questions = (self.payload.get("tool_input") or {}).get("questions") or []
         self.page = 0
         self.answers = {}
+        self.picked = []
         self.expanded = False
 
     def spec(self):
@@ -184,7 +185,8 @@ class Interactive:
             s = {"kind": "ask", "header": q.get("header", ""), "question": q.get("question", ""),
                  "page": f"{self.page + 1}/{len(self.questions)}",
                  "options": [o.get("label", "?") for o in q.get("options", [])],
-                 "descs": [o.get("description", "") for o in q.get("options", [])]}
+                 "descs": [o.get("description", "") for o in q.get("options", [])],
+                 "multi": bool(q.get("multiSelect")), "picked": list(self.picked)}
         s["expanded"] = self.expanded
         return s
 
@@ -2576,9 +2578,19 @@ class Smellyfish(QObject):
             result = None
             if value == bubble.TERMINAL:
                 result = {}
-            elif it.is_ask and isinstance(value, (tuple, list)) and value[0] == "option":
+            elif it.is_ask and isinstance(value, (tuple, list)) and value[0] == "toggle":
+                it.picked = [o for o in it.picked if o != value[1]] if value[1] in it.picked else it.picked + [value[1]]
+                return self.refresh_bubble()
+            elif it.is_ask and isinstance(value, (tuple, list)) and value[0] in ("option", "confirm"):
                 q = it.questions[it.page]
-                it.answers[q.get("question", "")] = value[1]
+                if value[0] == "confirm":
+                    if not it.picked:
+                        return
+                    order = [o.get("label") for o in q.get("options", [])]
+                    it.answers[q.get("question", "")] = ", ".join(sorted(it.picked, key=order.index))
+                    it.picked = []
+                else:
+                    it.answers[q.get("question", "")] = value[1]
                 it.page += 1
                 if it.page >= len(it.questions):
                     result = ask_answer(it.payload, it.answers)
@@ -3149,6 +3161,29 @@ class RecycleWatchProxy(recyclebin.RecycleWatch):
         self.poll_soon.connect(self.poll)
 
 
+_INSTANCE_LOCK = None
+
+
+def hold_instance_lock():
+    """One running Smellyfish per profile, enforced with an OS file lock held for the whole run."""
+    global _INSTANCE_LOCK
+    os.makedirs(paths.HOME_DIR, exist_ok=True)
+    f = open(os.path.join(paths.HOME_DIR, "instance.lock"), "a+b")
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        f.close()
+        return False
+    _INSTANCE_LOCK = f
+    return True
+
+
 def already_running():
     """Ask the local server before starting, so two instances never fight over the settings."""
     import socket
@@ -3175,8 +3210,17 @@ def main():
     if already_running():
         print("Smellyfish is already running.")
         return 0
+    for _ in range(40):
+        if hold_instance_lock():
+            break
+        time.sleep(0.25)
+    else:
+        print("Smellyfish is already running (profile locked).")
+        return 0
     from smellyfish import logs
     logs.setup()
+    import logging
+    logging.getLogger("smellyfish").info("start v%s pid %s exe %s", __version__, os.getpid(), sys.executable)
     paths.ensure_relay()
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)

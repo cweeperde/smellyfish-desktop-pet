@@ -202,8 +202,15 @@ def content(lay, spec):
         lay.chip(spec.get("header") or "Question", CHIP["ask"], spec.get("page", ""))
         lay.text(spec["question"], max_lines=12)
         descs = spec.get("descs") or [""] * len(spec["options"])
-        for i, (o, desc) in enumerate(zip(spec["options"], descs)):
-            lay.option(o, ("option", o), i == 0, desc)
+        if spec.get("multi"):
+            picked = set(spec.get("picked") or [])
+            lay.text("Pick one or more:", color=GREY)
+            for o, desc in zip(spec["options"], descs):
+                lay.option(("[x] " if o in picked else "[ ] ") + o, ("toggle", o), o in picked, desc)
+            lay.buttons([("Confirm", ("confirm",), bool(picked))])
+        else:
+            for i, (o, desc) in enumerate(zip(spec["options"], descs)):
+                lay.option(o, ("option", o), i == 0, desc)
         extra = [("Type answer...", "__type__"), ("Answer in terminal", TERMINAL)]
     elif kind == "perm":
         lay.chip(spec.get("tool", "Tool"), CHIP["perm"], spec.get("right", ""))

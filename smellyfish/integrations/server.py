@@ -5,12 +5,15 @@ Most events are answered immediately with {}. Events the pet can answer with a b
 wait expires; every failure path answers {} so Claude Code falls back to the terminal.
 """
 import itertools
+import logging
 import json
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from PySide6.QtCore import QObject, Signal
+
+log = logging.getLogger("smellyfish.hooks")
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("SMELLYFISH_PORT", "47811"))
@@ -23,7 +26,7 @@ def is_answerable(payload):
         return payload.get("tool_name") != "AskUserQuestion"
     if event == "PreToolUse" and payload.get("tool_name") == "AskUserQuestion":
         qs = (payload.get("tool_input") or {}).get("questions") or []
-        return 0 < len(qs) <= 4 and all(not q.get("multiSelect") and q.get("options") for q in qs)
+        return 0 < len(qs) <= 4 and all(q.get("options") for q in qs)
     return False
 
 
@@ -95,7 +98,11 @@ class HookServer(QObject):
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
 
     def handle(self, payload):
-        if not (is_answerable(payload) and self.policy(payload)):
+        answerable = is_answerable(payload)
+        allowed = answerable and self.policy(payload)
+        log.info("hook %s %s from %s: %s", payload.get("hook_event_name"), payload.get("tool_name") or "",
+                 payload.get("_source"), "bubble" if allowed else "answerable but off" if answerable else "info")
+        if not allowed:
             self.event.emit(payload)
             return {}
         p = Pending(str(next(self._ids)), payload)
