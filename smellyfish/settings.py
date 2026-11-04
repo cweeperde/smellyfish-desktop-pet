@@ -1,7 +1,9 @@
 """Persistent user settings and Windows autostart."""
+import contextlib
 import json
 import os
 import sys
+import time
 
 from smellyfish.paths import HOME_DIR as DIR, pet_command
 
@@ -138,25 +140,75 @@ class Settings(dict):
         self._dirty.add(key)
 
     def save(self):
+        """Merge only the keys changed here into the file, under a lock shared by all processes."""
         if self.readonly:
             return
         os.makedirs(DIR, exist_ok=True)
-        disk = {}
-        try:
-            with open(PATH, encoding="utf-8") as f:
-                disk = json.load(f)
-        except (OSError, ValueError):
+        with _file_lock(PATH + ".lock"):
             disk = {}
-        merged = dict(DEFAULTS, **{k: v for k, v in disk.items() if k in DEFAULTS})
-        merged.update({k: self[k] for k in self._dirty})
-        tmp = PATH + f".{os.getpid()}.tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(merged, f, indent=2)
-        os.replace(tmp, PATH)
+            try:
+                with open(PATH, encoding="utf-8") as f:
+                    disk = json.load(f)
+            except (OSError, ValueError):
+                disk = {}
+            merged = dict(DEFAULTS, **{k: v for k, v in disk.items() if k in DEFAULTS})
+            merged.update({k: self[k] for k in self._dirty})
+            tmp = PATH + f".{os.getpid()}.tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(merged, f, indent=2)
+            for _ in range(50):
+                try:
+                    os.replace(tmp, PATH)
+                    break
+                except PermissionError:
+                    time.sleep(0.02)
+            else:
+                os.replace(tmp, PATH)
+            self._dirty.clear()
+            for k, v in merged.items():
+                dict.__setitem__(self, k, v)
 
     def set(self, key, value):
         self[key] = value
         self.save()
+
+
+@contextlib.contextmanager
+def _file_lock(path, timeout=5.0):
+    """Exclusive lock on a small lock file (Windows: msvcrt, elsewhere: fcntl)."""
+    f = open(path, "a+b")
+    locked = False
+    try:
+        deadline = time.time() + timeout
+        while True:
+            try:
+                if sys.platform == "win32":
+                    import msvcrt
+                    f.seek(0)
+                    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                locked = True
+                break
+            except OSError:
+                if time.time() > deadline:
+                    raise TimeoutError(f"settings are locked: {path}")
+                time.sleep(0.01)
+        yield
+    finally:
+        if locked:
+            try:
+                if sys.platform == "win32":
+                    import msvcrt
+                    f.seek(0)
+                    msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+        f.close()
 
 
 def autostart_command():

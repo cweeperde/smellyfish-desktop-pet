@@ -1,9 +1,10 @@
 """Self-update for the packaged exe from the project's GitHub releases.
 
-The new exe is downloaded next to the running one, checked against the SHA-256 digest
-GitHub publishes for release assets, and swapped in place. It runs on the next start.
+The new exe is downloaded next to the running one and only swapped in when its SHA-256 matches
+the digest GitHub publishes for the release asset (no digest, no update). It runs on the next start.
 """
 import hashlib
+import hmac
 import json
 import os
 import sys
@@ -76,7 +77,10 @@ class Updater(QObject):
                     self.status.emit(f"You have the newest version ({__version__}).")
                 return
             asset = next((a for a in rel.get("assets") or [] if a.get("name") == ASSET), None)
-            if asset is None:
+            digest = ((asset or {}).get("digest") or "").lower()
+            if asset is None or not digest.startswith("sha256:") or len(digest) != 71:
+                if manual:
+                    self.status.emit("The new version has no verifiable download yet, I'll try again later.")
                 return
             new = sys.executable + ".new"
             sha = hashlib.sha256()
@@ -87,9 +91,7 @@ class Updater(QObject):
                         break
                     sha.update(chunk)
                     f.write(chunk)
-            digest = (asset.get("digest") or "").lower()
-            if (digest.startswith("sha256:") and digest[7:] != sha.hexdigest()) or os.path.getsize(new) != asset.get(
-                    "size", os.path.getsize(new)):
+            if not hmac.compare_digest(digest[7:], sha.hexdigest()):
                 os.remove(new)
                 self.status.emit("The update download was damaged, I'll try again later.")
                 return
