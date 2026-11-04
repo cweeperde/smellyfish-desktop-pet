@@ -67,6 +67,10 @@ smellyfish/
 tools/build_exe.py    how the release exe is built
 ```
 
+## A note on AI
+
+Parts of the code were written, modified or assisted by AI.
+
 ## License
 
 Copyright © 2026 cweeper. All rights reserved. The code is public so you can read and review it; see [LICENSE](LICENSE) for what is and isn't allowed.
