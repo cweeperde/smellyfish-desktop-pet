@@ -503,6 +503,7 @@ class Smellyfish(QObject):
     def __init__(self):
         super().__init__()
         self.cfg = cfg.Settings()
+        sounds.set_muted(self.cfg["mute_all"])
         self.cfg.on_error = self.on_save_error
         self.save_retry = QTimer(self, singleShot=True, timeout=self.cfg.save)
         self.pix = int(self.cfg["scale"])
@@ -2678,6 +2679,8 @@ class Smellyfish(QObject):
                 self.cache.clear()
                 self.weather.refresh()
                 self.render()
+            elif key == "mute_all":
+                sounds.set_muted(value)
             elif key == "dnd":
                 self.set_dnd(value)
             elif key == "clicker":
@@ -2746,6 +2749,9 @@ class Smellyfish(QObject):
         dnd = QAction("Do not disturb", m, checkable=True, checked=bool(self.cfg["dnd"]))
         dnd.toggled.connect(lambda on: self.apply_setting("dnd", on))
         m.addAction(dnd)
+        mute_all = QAction("Mute all sounds", m, checkable=True, checked=bool(self.cfg["mute_all"]))
+        mute_all.toggled.connect(lambda on: self.apply_setting("mute_all", on))
+        m.addAction(mute_all)
         mute = QAction("Mute fun sounds", m, checkable=True, checked=not self.cfg["sfx"])
         mute.toggled.connect(lambda on: self.apply_setting("sfx", not on))
         m.addAction(mute)

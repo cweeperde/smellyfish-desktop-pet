@@ -81,6 +81,7 @@ SCHEMA = [
         ("discord_messages", "Show Discord messages (needs setup)", None),
     ]),
     ("Sound & focus", [
+        ("mute_all", "Mute all sounds (overrides everything below)", None),
         ("sound_done", "Notification sound (tasks done, questions, alarms)", None),
         ("notify_volume", "Notification volume", VOLUMES),
         ("sfx", "Fun sounds (off in do not disturb and sleep)", None),

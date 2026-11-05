@@ -155,6 +155,12 @@ for _i, _f in enumerate((520, 600, 690, 780, 880)):
     SOUNDS[f"blip{_i}"] = (lambda f: lambda: _tone([((f, f * 1.08), 0.05)], wave_fn=_sine, decay=18))(_f)
 
 NOTIFY = {"done", "question", "alarm", "message", "warn"}
+MUTED = False
+
+
+def set_muted(on):
+    global MUTED
+    MUTED = bool(on)
 
 
 def _write(name, volume):
@@ -173,7 +179,7 @@ def _write(name, volume):
 
 
 def play(name, volume=60):
-    if sys.platform != "win32" or name not in SOUNDS or volume <= 0:
+    if MUTED or sys.platform != "win32" or name not in SOUNDS or volume <= 0:
         return
     try:
         import winsound

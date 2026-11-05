@@ -59,6 +59,7 @@ DEFAULTS = {
     "discord_client_secret": "",
     "discord_redirect": "http://localhost",
     "discord_token": None,
+    "mute_all": False,
     "sound_done": True,
     "sfx": True,
     "volume": 60,
