@@ -119,6 +119,8 @@ class Updater(QObject):
 
 def restart():
     import subprocess
-    env = dict(os.environ, SMELLYFISH_RESTART="1")
+    # The new exe must start as a fresh app, not as a child of the old one (the bootloader refuses that)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("_PYI") and k != "_MEIPASS2"}
+    env.update(SMELLYFISH_RESTART="1", PYINSTALLER_RESET_ENVIRONMENT="1")
     subprocess.Popen([sys.executable], env=env, close_fds=True,
                      creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
