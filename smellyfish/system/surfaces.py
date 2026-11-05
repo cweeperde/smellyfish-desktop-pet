@@ -3,12 +3,17 @@
 Rectangles come from Win32 in physical pixels and are converted to Qt's logical
 coordinates per monitor. An edge counts only where no window above it in z-order
 covers it.
+
+Desktop icons count as small surfaces too (see icons.py). Only icons with free desktop
+above them qualify, so the pet never covers another icon.
 """
 import ctypes
 import sys
 from ctypes import wintypes
 
 from PySide6.QtGui import QGuiApplication
+
+from smellyfish.system import icons as desk_icons
 
 IS_WIN = sys.platform == "win32"
 if IS_WIN:
@@ -31,12 +36,13 @@ class MONITORINFOEXW(ctypes.Structure):
 
 
 class Surface:
-    __slots__ = ("hwnd", "x0", "x1", "y", "covers", "bottom")
+    __slots__ = ("hwnd", "x0", "x1", "y", "covers", "bottom", "icon")
 
     def __init__(self, hwnd, x0, x1, y):
         self.hwnd, self.x0, self.x1, self.y = hwnd, x0, x1, y
         self.covers = []
         self.bottom = y
+        self.icon = None
 
     def side_visible(self, x, y_from, y_to, step=12):
         """The window's vertical edge at x is not covered by windows in front between y_from and y_to."""
@@ -123,10 +129,18 @@ def window_rects(exclude=()):
     return out
 
 
-def surfaces(exclude=(), min_room=0):
-    """Top edges of windows, each knowing which windows in front of it cover parts of it."""
+def surfaces(exclude=(), min_room=0, windows=True, icons=None):
+    """Top edges of windows, each knowing which windows in front of it cover parts of it.
+    icons=(width, height) of the pet also adds the desktop icons that have that much free room above them."""
     rects = window_rects(exclude)
     out = []
+    if icons:
+        covers = [r for _, r in rects]
+        for s in icon_surfaces(icons[0], icons[1], min_room):
+            s.covers = covers
+            out.append(s)
+    if not windows:
+        return out
     for i, (hwnd, (x0, y0, x1, y1)) in enumerate(rects):
         screen = QGuiApplication.screenAt(_qpoint((x0 + x1) / 2, y0 + 2))
         if screen is None or y0 - min_room < screen.availableGeometry().top():
@@ -139,7 +153,10 @@ def surfaces(exclude=(), min_room=0):
 
 
 def window_top(hwnd):
-    """Current logical top edge (x0, x1, y) of a window, or None if it is gone or hidden."""
+    """Current logical top edge (x0, x1, y) of a window (or desktop icon), or None if it is gone or hidden."""
+    if isinstance(hwnd, tuple):
+        found = _find_icon(hwnd)
+        return (found[0][0], found[0][2], found[1][1]) if found else None
     if not IS_WIN or not user32.IsWindow(hwnd) or not user32.IsWindowVisible(hwnd) or user32.IsIconic(hwnd) \
             or _cloaked(hwnd):
         return None
@@ -150,3 +167,40 @@ def window_top(hwnd):
 def _qpoint(x, y):
     from PySide6.QtCore import QPoint
     return QPoint(round(x), round(y))
+
+
+def _icons():
+    return desk_icons.desktop_icons(lambda r: _to_logical(r))
+
+
+def _find_icon(key):
+    for bounds, glyph in _icons():
+        if (round(bounds[0]), round(glyph[1])) == key[1:]:
+            return bounds, glyph
+    return None
+
+
+def icon_bounds(key):
+    found = _find_icon(key)
+    return found[0] if found else None
+
+
+def icon_surfaces(foot_w, foot_h, min_room):
+    """Icons wide enough for the pet, with nothing but empty desktop in the space it would fill above them."""
+    icons = _icons()
+    out = []
+    for i, (b, g) in enumerate(icons):
+        x0, x1, top = b[0], b[2], g[1]
+        if x1 - x0 < foot_w:
+            continue
+        screen = QGuiApplication.screenAt(_qpoint((x0 + x1) / 2, top + 2))
+        if screen is None or top - min_room < screen.availableGeometry().top():
+            continue
+        probe = (x0, top - foot_h, x1, top)
+        if any(j != i and ob[0] - 2 < probe[2] and ob[2] + 2 > probe[0] and ob[1] - 2 < probe[3]
+               and ob[3] + 2 > probe[1] for j, (ob, _g) in enumerate(icons)):
+            continue
+        s = Surface(("icon", round(x0), round(top)), x0, x1, top)
+        s.bottom, s.icon = b[3], b
+        out.append(s)
+    return out

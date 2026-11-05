@@ -106,6 +106,21 @@ ASK = [
 ]
 HEART = [".P.P.", "PPPPP", ".PPP.", "..P.."]
 BANG = ["RR", "RR", "RR", "..", "RR"]
+def checkoff():
+    board = lambda n, dy=0: [(_clipboard(n), BX + 16, BY + dy)]
+    arms = ("rest_l", "up_r")
+    intro = [(Pose(ex=1, ey=1, arm_f=arms, parts=board(0)), 160),
+             (Pose(ex=1, ey=1, arm_f=("rest_l", "wave_r"), parts=board(0)), 140),
+             (Pose(ex=1, ey=1, arm_f=arms, parts=board(0)), 140),
+             (Pose(ex=1, ey=1, arm_f=("rest_l", "wave_r"), parts=board(1)), 200),
+             (Pose(eyes="happy", blush=True, dy=-1, tent="long", arm_f=("up_l", "up_r"),
+                   parts=board(1, -1) + [(SPARKLE, BX + 14, BY - 4)]), 220),
+             (Pose(eyes="happy", blush=True, arm_f=("rest_l", "up_r"),
+                   parts=board(1) + [(SPARKLE, BX + 18, BY - 5)]), 260),
+             (Pose(eyes="happy"), 200)]
+    return {"intro": intro, "loop": []}
+
+
 ZZZ = ["WWWW", "..W.", ".W..", "WWWW"]
 ZZZ_DIM = ["wwww", "..w.", ".w..", "wwww"]
 CAP = [
@@ -914,29 +929,31 @@ def mail():
 # ---------------------------------------------------------------- outfits (drawn on top of front poses)
 OUTFITS = {
     "santa": [
-        "............W...",
-        "..........XXX...",
-        "......XXXXXX....",
-        "....XXXXXXXX....",
-        "..WWWWWWWWWWWW..",
+        "......xxXXXX....",
+        "....xXXXXXXXXX..",
+        "...xXXXXXXXXXXZW",
+        "..xXXXXXXXXXXXZW",
+        "..WWWWWWWWWWWWW.",
     ],
     "witch": [
         ".......ee.......",
         "......eeee......",
         ".....eeaaee.....",
         "....eeeeeeee....",
+        "...eeeeeeeeee...",
         ".eeeeeeeeeeeeee.",
     ],
     "party": [
-        ".......Y........",
-        "......PYP.......",
-        "......YPY.......",
-        ".....PYPYP......",
+        ".......W........",
+        "......YYY.......",
         ".....YPYPY......",
+        "....PYPYPYP.....",
+        "...YPYPYPYPY....",
     ],
     "valentine": [
         "..P.P......P.P..",
         ".PPPPP....PPPPP.",
+        ".PWPPP....PWPPP.",
         "..PPP......PPP..",
         "...P........P...",
     ],
@@ -1093,13 +1110,43 @@ def carry():
 
 
 # ---------------------------------------------------------------- weather accessories (front poses only)
+SCARF = [
+    ".xxxxxxxxxxxxxx.",
+    ".XXWXXXWXXXWXXX.",
+    ".ZZZZZZZZZZZZZZ.",
+    "............XWZ.",
+    "............XXZ.",
+    "............XWZ.",
+    "............Z.Z.",
+]
+SCARF_SIDE = [
+    ".xxxxxxxxxxxx.",
+    ".XXWXXXWXXXXX.",
+    ".ZZZZZZZZZZZZ.",
+    "XWZ...........",
+    "XXZ...........",
+    "XWZ...........",
+    "Z.Z...........",
+]
+SHADES = [
+    "..HHHHH..HHHHH..",
+    "..HhnnHHHHhnnH..",
+    "..HnnnH..HnnnH..",
+    "..HHHHH..HHHHH..",
+]
+SHADES_SIDE = [
+    "....HHHHHHHHH.",
+    "....HhnnHhnnH.",
+    "....HnnnHnnnH.",
+    "....HHHHHHHHH.",
+]
+RAIN = [(([".....BBBBBB.....", "...BBBBBBBBBB...", ".BBBBBBBBBBBBBB.", "BWBWBWBWBWBWBWBW",
+           ".......q........", ".......q........"]), 0, -6)]
 WEATHER = {
-    "sun": [(["...eeeeeeeeee...", "...eee....eee..."], 0, 4)],
-    "rain": [([".....BBBBBB.....", "...BBBBBBBBBB...", ".BBBBBBBBBBBBBB.", "BWBWBWBWBWBWBWBW",
-               ".......q........", ".......q........"], 0, -6)],
-    "cold": [(["..RWRWRWRWRWRW..", ".............RR.", ".............RW.", "..............R."], 0, 7)],
-    "snow": [(["..RWRWRWRWRWRW..", ".............RR.", ".............RW.", "..............R."], 0, 7),
-             (["W.....W....W", "...W.....W..", ".W.....W...."], 2, -7)],
+    "sun": [(SHADES, 0, 3)],
+    "rain": RAIN,
+    "cold": [(SCARF, 0, 6)],
+    "snow": [(SCARF, 0, 6), (["W.....W....W", "...W.....W..", ".W.....W...."], 2, -7)],
 }
 
 
@@ -1118,11 +1165,11 @@ def with_gear(p, headset=None, band=False, sweat=False):
     return p.but(**kw) if kw else p
 
 
-SCARF_SIDE = [".RWRWRWRWRWRW.", "RR............", "WR............", ".R............"]
 WEATHER_SIDE = {
+    "sun": [(SHADES_SIDE, 0, 3)],
     "rain": WEATHER["rain"],
-    "cold": [(SCARF_SIDE, 1, 7)],
-    "snow": [(SCARF_SIDE, 1, 7), WEATHER["snow"][1]],
+    "cold": [(SCARF_SIDE, 0, 6)],
+    "snow": [(SCARF_SIDE, 0, 6), WEATHER["snow"][1]],
 }
 
 
@@ -1581,7 +1628,7 @@ ANIMATIONS = {"idle": idle, "working": working, "thinking": thinking, "question"
               "climb": climb, "snack": lambda: eat(FISH), "nom": lambda: eat(NOTE_PAPER), "camera": camera,
               "trophy": trophy, "peek": peek, "carry": carry, "reminder": reminder, "rainy": rainy,
               "sunny": sunny, "snowy": snowy, "shiver": shiver, "cloudy": cloudy,
-              "search": search, "terminal": terminal, "browse": browse, "todo": todo, "tickled": tickled,
+              "search": search, "terminal": terminal, "browse": browse, "todo": todo, "checkoff": checkoff, "tickled": tickled,
               "petted": petted, "trash_full": trash_full, "sweep": sweep, "warn": warn,
               "cooking": cooking, "yoyo": yoyo, "juggle": juggle, "tea": tea, "gaming": gaming,
               "paper_plane": paper_plane, "bubblegum": bubblegum, "doodle": doodle}

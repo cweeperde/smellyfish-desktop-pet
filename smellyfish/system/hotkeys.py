@@ -17,9 +17,10 @@ ACTIONS = [
     ("focus", "Focus timer start / stop"),
     ("chase", "Chase the cursor"),
     ("mini", "Mini mode"),
+    ("todo", "To-do list"),
 ]
 DEFAULTS = {"toggle": "Ctrl+Alt+F9", "home": "Ctrl+Alt+F10", "dnd": "Ctrl+Alt+F11", "history": "Ctrl+Alt+F12",
-            "focus": "Ctrl+Alt+F8", "chase": "Ctrl+Alt+F7", "mini": "Ctrl+Alt+F6"}
+            "focus": "Ctrl+Alt+F8", "chase": "Ctrl+Alt+F7", "mini": "Ctrl+Alt+F6", "todo": "Ctrl+Alt+F5"}
 
 
 def parse(text):

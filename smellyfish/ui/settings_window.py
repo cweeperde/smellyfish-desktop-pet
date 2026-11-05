@@ -41,6 +41,7 @@ SCHEMA = [
     ("Movement", [
         ("gravity", "Gravity", None),
         ("sit_on_windows", "Sit on windows", None),
+        ("sit_on_icons", "Sit on desktop icons (only ones with free space above)", None),
         ("window_hop", "Jump between windows", None),
         ("wander", "Hop around by itself", None),
         ("trips_home", "Go home now and then", None),
@@ -65,6 +66,7 @@ SCHEMA = [
         ("react_battery", "Battery warnings", None),
         ("react_network", "Notice when offline", None),
         ("react_greet", "Say hi when you come back", None),
+        ("todo_greet", "Mention open to-dos when you come back", None),
         ("react_lock", "React to screen lock", None),
         ("react_night", "Yawn late at night", None),
         ("react_hover", "Blush when you hover over it", None),

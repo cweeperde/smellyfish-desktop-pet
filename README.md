@@ -59,7 +59,7 @@ Smellyfish is meant to be easy to trust, which is why the source is public.
 smellyfish/
   app.py              the pet: windows, animation player, physics, events
   art/                sprites and animations (pixel art as text), bubbles, house, sounds
-  features/           focus timer, achievements, toys
+  features/           focus timer, to-do list, achievements, toys
   integrations/       hook server and relay, Claude Code / Codex hooks, usage limits, Discord, weather
   system/             window edges, PC monitor, recycle bin, hotkeys, beat detection
   ui/                 settings and other windows

@@ -22,7 +22,7 @@ GREEN = (130, 230, 150)
 YELLOW = (255, 210, 80)
 SHADOW = (14, 16, 28, 150)
 CHIP = {"ask": LAV, "perm": YELLOW, "done": GREEN, "wait": LAV, "focus": (255, 160, 60), "reminder": YELLOW,
-        "discord": (150, 160, 255), "trophy": YELLOW, "critical": (255, 110, 110)}
+        "discord": (150, 160, 255), "todo": (130, 200, 150), "trophy": YELLOW, "critical": (255, 110, 110)}
 
 TERMINAL = "__terminal__"
 EXPAND = "__expand__"

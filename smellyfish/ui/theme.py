@@ -51,6 +51,8 @@ QComboBox QAbstractItemView {{ background: {PANEL}; border: 3px solid {DARK}; se
                                outline: none; }}
 QListWidget {{ background: {FIELD}; border: 3px solid {DEEP}; outline: none; padding: 4px; }}
 QListWidget::item {{ padding: 4px 6px; }}
+QListWidget::indicator {{ width: 14px; height: 14px; border: 3px solid {DEEP}; background: {FIELD}; }}
+QListWidget::indicator:checked {{ background: {LAV}; border-color: {LIGHT}; image: url(CHECK_PNG); }}
 QListWidget::item:selected {{ background: {DARK}; color: {TEXT}; }}
 QPushButton {{ background: {LAV}; color: {INK}; font-weight: bold; padding: 7px 14px;
                border: 3px solid {DARK}; border-top-color: {LIGHT}; border-left-color: {LIGHT};

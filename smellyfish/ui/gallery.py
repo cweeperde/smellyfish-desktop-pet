@@ -19,7 +19,7 @@ CATEGORIES = [
     ("PC & apps", ["hot", "battery_low", "charging", "offline", "music", "call", "call_muted", "call_deaf", "mail",
                    "focus", "alarm"]),
     ("Home & moving", ["water", "swim", "climb", "land", "fall", "held", "peek"]),
-    ("Toys & fun", ["snack", "nom", "camera", "trophy", "carry", "trash_full", "sweep"]),
+    ("Toys & fun", ["snack", "nom", "checkoff", "camera", "trophy", "carry", "trash_full", "sweep"]),
 ]
 SCALE = 8
 BG = (34, 36, 48)

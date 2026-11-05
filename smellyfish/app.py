@@ -25,6 +25,7 @@ from smellyfish.art.house import HouseView
 from smellyfish.features import toys
 from smellyfish.features.focus import FocusTimer
 from smellyfish.features.life import Life
+from smellyfish.features.todos import Todos, fmt_due
 from smellyfish.integrations import install_hooks
 from smellyfish.integrations.discord_watch import DiscordWatch
 from smellyfish.integrations.server import HookServer, ask_answer, permission_answer
@@ -38,6 +39,7 @@ from smellyfish.system.inputcount import InputCounter
 from smellyfish.system.pcmonitor import PcMonitor
 from smellyfish.ui.gallery import DiscordSetup, GalleryWindow, HistoryWindow
 from smellyfish.ui.settings_window import SCHEMA, SettingsWindow
+from smellyfish.ui.todo_window import TodoWindow
 
 FEET = sprite.FEET
 BODY_X0, BODY_X1 = sprite.BX + 1, sprite.BX + 15
@@ -93,7 +95,7 @@ def fmt_elapsed(sec, short=False):
 ONCE_PRIO = {
     "alarm": 90, "warn": 85, "error": 80, "reminder": 75, "angry": 70, "dizzy": 65, "trophy": 60,
     "trash_full": 55, "sweep": 55, "water": 55, "land": 5,
-    "tickled": 45, "petted": 45, "happy": 40, "sad": 40, "nom": 40, "snack": 40, "camera": 40, "shy": 35,
+    "tickled": 45, "petted": 45, "checkoff": 42, "happy": 40, "sad": 40, "nom": 40, "snack": 40, "camera": 40, "shy": 35,
     "hello": 30, "bye": 30, "stretch": 25,
     "look_around": 10, "bubbles": 10, "read": 10, "sneeze": 10, "yawn": 10, "yoyo": 10, "juggle": 10,
     "tea": 10, "gaming": 10, "paper_plane": 10, "bubblegum": 10, "doodle": 10,
@@ -102,7 +104,7 @@ ONCE_PRIO = {
 ROAM_BASES = {"idle", "music", "call", "call_muted", "call_deaf", "hot", "offline", "battery_low",
               "working", "thinking", "search", "terminal", "browse", "todo", "cooking"}
 ANIM_SOUNDS = {"tickled": "giggle", "petted": "purr", "sweep": "sweep", "water": "splash", "nom": "munch",
-               "snack": "munch", "camera": "shutter", "trophy": "fanfare", "sneeze": "sneeze", "yawn": "yawn",
+               "snack": "munch", "checkoff": "pop", "camera": "shutter", "trophy": "fanfare", "sneeze": "sneeze", "yawn": "yawn",
                "hello": "hello", "bubbles": "pop", "dizzy": "boing", "trash_full": "stink", "sad": "sad",
                "happy": "happy", "shy": "pop", "paper_plane": "whoosh", "juggle": "jump"}
 
@@ -512,7 +514,7 @@ class Smellyfish(QObject):
         self.badge = BadgeView(self)
         self.house = HouseView(self)
         self.settings_win = self.gallery_win = self.history_win = self.discord_win = None
-        self.achievements_win = None
+        self.achievements_win = self.todo_win = None
         self.cache, self.hang_cache = {}, {}
         self.pose = None
         self.eyes = (0, 0)
@@ -534,6 +536,7 @@ class Smellyfish(QObject):
         self.hotkeys = Hotkeys()
         self.hotkey_conflicts = []
         self.life = Life(self.cfg)
+        self.todos = Todos(self.cfg)
         self.weather = Weather(self.cfg)
         self.weather.changed.connect(lambda _k: (self.cache.clear(), self.render()))
         self.weather.status.connect(lambda t: self.settings_win and self.settings_win.set_weather_status(t))
@@ -555,6 +558,7 @@ class Smellyfish(QObject):
         self.perch = None
         self.perch_seen = None
         self.surfs, self.surfs_at = [], 0
+        self.icon_surfs, self.icon_since = [], None
         self.homing, self.route_hops, self.home_after_land, self.after_land = False, 0, False, None
         self.target = None
         self.water_phase = None
@@ -609,7 +613,7 @@ class Smellyfish(QObject):
         self.press_flush.start(30000)
         self.updater = updater.Updater(self.cfg)
         self.updater.ready.connect(self.on_update_ready)
-        self.updater.status.connect(lambda t: self.set_info({"kind": "wait", "chip": "Update", "text": t}))
+        self.updater.status.connect(lambda t: self.notice({"kind": "wait", "chip": "Update", "text": t}))
         self.server.debug = {
             "state": lambda _: {"anim": self.player.name, "base": self.player.base, "mode": self.player.mode,
                                 "bubble": self.bubble_kind(), "interactive": len(self.interactive),
@@ -986,21 +990,30 @@ class Smellyfish(QObject):
     def own_hwnds(self):
         return {int(w.winId()) for w in (self.view, self.bubble, self.house, self.badge)}
 
-    def get_surfaces(self, fresh=False):
+    def get_surfaces(self, fresh=False, icons=False):
+        """Window tops; icons=True adds desktop icons. The icon the pet sits on is always included."""
         if fresh or time.time() - self.surfs_at > 0.3:
             room = (FEET - sprite.BY + 2) * self.pix
-            self.surfs = surfaces.surfaces(self.own_hwnds(), room) if self.cfg["sit_on_windows"] else []
+            foot = None
+            if self.cfg.get("sit_on_icons"):
+                foot = (2 * HALF_W * self.pix, (FEET - sprite.BY + 3) * self.pix)
+            found = surfaces.surfaces(self.own_hwnds(), room, self.cfg["sit_on_windows"], foot)
             fixed = self.fixed_screen()
             if fixed is not None:
                 g = fixed.geometry()
                 keep = []
-                for s in self.surfs:
+                for s in found:
                     if g.top() <= s.y <= g.bottom() and s.x1 > g.left() + 20 and s.x0 < g.right() - 20:
                         s.x0, s.x1 = max(s.x0, g.left()), min(s.x1, g.right())
                         keep.append(s)
-                self.surfs = keep
+                found = keep
+            self.surfs = [s for s in found if not s.icon]
+            self.icon_surfs = [s for s in found if s.icon]
             self.surfs_at = time.time()
-        return self.surfs
+        if icons:
+            return self.surfs + self.icon_surfs
+        here = self.perch[0] if self.perch else None
+        return self.surfs + [s for s in self.icon_surfs if here is not None and s.hwnd == here]
 
     def fits(self, s, cx):
         m = HALF_W * self.pix
@@ -1053,7 +1066,7 @@ class Smellyfish(QObject):
         new_feet, cx = self.feet(), self.cx()
         hit = None
         if self.vy > 0:
-            cands = [] if self.target is not None else [s for s in self.get_surfaces() if self.fits(s, cx)]
+            cands = [] if self.target is not None else [s for s in self.get_surfaces(icons=True) if self.fits(s, cx)]
             if self.target is not None:
                 cands.append(self.target)
             bed = self.bed_surface()
@@ -1136,7 +1149,7 @@ class Smellyfish(QObject):
         cx, feet = self.cx(), self.feet()
         best = None
         extra = [b for b in (self.bed_surface(),) if b is not None]
-        for s in self.get_surfaces(fresh=True) + extra + [self.floor_surface()]:
+        for s in self.get_surfaces(fresh=True, icons=True) + extra + [self.floor_surface()]:
             ok = self.fits(s, cx) if s.hwnd else s.visible_at(cx)
             if ok and s.y - 14 <= feet <= s.y + 10 * self.pix:
                 if best is None or abs(s.y - feet) < abs(best.y - feet):
@@ -1168,6 +1181,8 @@ class Smellyfish(QObject):
                     self.anchor_cx += nx0 - x0
             if not nx0 <= self.cx() <= nx1:
                 return self.lost_perch()
+            if isinstance(hwnd, tuple) and self.icon_reached(hwnd, now):
+                return self.leave_icon()
             if now - self.surfs_at > 1.0:
                 cur = next((s for s in self.get_surfaces() if s.hwnd == hwnd), None)
                 if cur is None or not self.fits(cur, self.cx()):
@@ -1181,6 +1196,29 @@ class Smellyfish(QObject):
                 return
             if not any(abs(s.y - self.feet()) < 2 and self.fits(s, self.cx()) for s in self.get_surfaces()):
                 self.lost_perch()
+
+    def icon_reached(self, key, now):
+        """The cursor has been over the icon the pet sits on for a moment (the user wants to use it)."""
+        b = surfaces.icon_bounds(key)
+        pos = QCursor.pos()
+        if b is None or self.press is not None or not (b[0] - 6 <= pos.x() <= b[2] + 6 and b[1] - 6 <= pos.y() <= b[3] + 6):
+            self.icon_since = None
+            return False
+        self.icon_since = self.icon_since or now
+        return now - self.icon_since > 0.5
+
+    def leave_icon(self):
+        """Hop down from a desktop icon to somewhere nearby."""
+        self.icon_since = None
+        cx, feet = self.cx(), self.feet()
+        a = self.area()
+        margin = HALF_W * self.pix
+        side = random.choice((-1, 1))
+        tx = max(a.left() + margin, min(a.right() - margin, cx + side * random.randint(110, 260)))
+        floor = self.screen_at(tx, feet + 4).availableGeometry().bottom() + 1
+        self.wandering = True
+        self.anchor_cx = tx
+        self.run_plan([("hop", (tx, max(feet, floor), None))])
 
     def lost_perch(self):
         self.home_after_land = True
@@ -1291,7 +1329,7 @@ class Smellyfish(QObject):
         """Steps to get from the floor onto window s by climbing its left or right side
         (the nearer one unless a side is given; now and then the far one for variety)."""
         cx, feet = self.cx(), self.feet()
-        if self.perch is not None:
+        if self.perch is not None or s.icon:
             return None
         margin = HALF_W * self.pix
         if left is None:
@@ -1324,7 +1362,7 @@ class Smellyfish(QObject):
         if not self.perch:
             return None
         s = next((w for w in self.get_surfaces(fresh=True) if w.hwnd == self.perch[0]), None)
-        if s is None:
+        if s is None or s.icon:
             return None
         margin = HALF_W * self.pix
         left = toward_x < (s.x0 + s.x1) / 2
@@ -1356,7 +1394,10 @@ class Smellyfish(QObject):
         if self.player.base != "idle" and random.random() < 0.35:
             return
         hop_chance = 0.45 if self.perch else 0.6
-        if self.cfg["window_hop"] and self.cfg["sit_on_windows"] and random.random() < hop_chance                 and self.wander_window():
+        if self.perch and isinstance(self.perch[0], tuple) and random.random() < 0.5:
+            return self.leave_icon()
+        if self.cfg["window_hop"] and (self.cfg["sit_on_windows"] or self.cfg.get("sit_on_icons")) \
+                and random.random() < hop_chance and self.wander_window():
             return
         a = self.area()
         margin = HALF_W * self.pix
@@ -1402,7 +1443,7 @@ class Smellyfish(QObject):
         margin = HALF_W * self.pix
         cx, feet = self.cx(), self.feet()
         jumps, climbs = [], []
-        for s in self.get_surfaces(fresh=True):
+        for s in self.get_surfaces(fresh=True, icons=True):
             if s.hwnd == here:
                 continue
             for x in range(int(s.x0 + margin), int(s.x1 - margin), 40):
@@ -1410,7 +1451,7 @@ class Smellyfish(QObject):
                     continue
                 if s.y >= feet - MAX_JUMP_UP and abs(x - cx) <= 900:
                     jumps.append((s, x))
-            if self.perch is None and s.y < feet - MAX_JUMP_UP + 40:
+            if self.perch is None and not s.icon and s.y < feet - MAX_JUMP_UP + 40:
                 for left in (True, False):
                     x = s.x0 + margin + 30 if left else s.x1 - margin - 30
                     if abs(x - cx) <= 1400 and self.fits(s, x):
@@ -1891,10 +1932,18 @@ class Smellyfish(QObject):
         if kind in ("user_back", "unlocked") and (self.cfg["react_greet"] or self.cfg["react_lock"]):
             self.player.base = "idle"
             self.player.once("hello")
+            if self.cfg.get("todo_greet") and self.todos.open_items() and kind == "user_back":
+                QTimer.singleShot(2500, self.todo_nudge)
         elif kind == "plugged" and self.cfg["react_battery"]:
             self.player.once("charging")
         elif kind == "online_again" and self.cfg["react_network"]:
             self.player.once("happy")
+
+    def todo_nudge(self):
+        if not self.interactive and not self.info and not self.cfg["dnd"] and not self.hidden_for_game():
+            self.todo_summary()
+            QTimer.singleShot(12000, lambda: self.set_info(None) if self.info and self.info.get(
+                "kind") == "todo" else None)
 
     def idle_base(self):
         return self.ambient()
@@ -2090,6 +2139,7 @@ class Smellyfish(QObject):
                 QTimer.singleShot(0, self.build_menu)
 
     def check_reminders(self):
+        self.check_todos()
         items = list(self.cfg.get("reminders") or [])
         now = time.time()
         due = [r for r in items if r["due"] <= now]
@@ -2109,6 +2159,100 @@ class Smellyfish(QObject):
             if self.phys == "rest" and not self.hanging:
                 self.player.once("reminder")
         QTimer.singleShot(0, self.build_menu)
+
+    # ------------------------------------------------------------ to-do list
+    def open_todos(self):
+        self._open("todo_win", TodoWindow)
+
+    def quick_todo(self):
+        from PySide6.QtWidgets import QInputDialog
+        text, ok = QInputDialog.getText(None, "Smellyfish - New task", "Task:")
+        if ok and text.strip():
+            self.todo_add(text, None)
+
+    def todos_changed(self):
+        QTimer.singleShot(0, self.build_menu)
+        self.badge_update()
+        if self.todo_win is not None and self.todo_win.isVisible():
+            self.todo_win.refresh()
+
+    def todo_add(self, text, due):
+        if self.todos.add(text, due):
+            self.bump("todos_added")
+            self.todos_changed()
+            if self.phys == "rest" and not self.hanging and not self.cfg["dnd"]:
+                self.player.once("happy")
+
+    def todo_set_done(self, tid, done=True):
+        t = self.todos.get(tid)
+        if not t or not self.todos.set_done(tid, done):
+            return
+        self.todos_changed()
+        if self.info and self.info.get("todo") == tid:
+            self.set_info(None, force=True)
+        if not done:
+            return
+        self.bump("todos_done")
+        if not self.todos.open_items():
+            self.bump("todo_clears")
+            self.todo_all_done()
+        elif self.phys == "rest" and not self.hanging and not self.cfg["dnd"]:
+            self.player.once("checkoff")
+
+    def todo_all_done(self):
+        if self.cfg["dnd"] or self.hidden_for_game():
+            return
+        if not self.interactive and not (self.info and self.info.get("kind") == "focus"):
+            self.set_info({"kind": "trophy", "chip": "To-do", "text": "Everything is done. Nice work!"})
+            QTimer.singleShot(7000, lambda: self.set_info(None) if self.info and self.info.get(
+                "kind") == "trophy" else None)
+        if self.phys == "rest" and not self.hanging:
+            self.player.once("trophy")
+
+    def todo_delete(self, tid):
+        self.todos.remove(tid)
+        self.todos_changed()
+
+    def todo_clear_done(self):
+        self.todos.clear_done()
+        self.todos_changed()
+
+    def check_todos(self):
+        due = self.todos.take_due()
+        if not due:
+            return
+        for t in due:
+            self.add_history("To-do", "Task due", t["text"])
+        if self.cfg["dnd"] or self.hidden_for_game():
+            self.unseen += len(due)
+            self.badge_update()
+            return
+        t = due[0]
+        more = f"\n(+{len(due) - 1} more due)" if len(due) > 1 else ""
+        self.notify_sound("alarm")
+        spec = {"kind": "reminder", "chip": "To-do", "text": t["text"] + more, "todo": t["id"],
+                "buttons": [("Done", ("todo_done", t["id"]), True), ("Snooze 10 min", ("todo_snooze", t["id"]), False)]}
+        self.set_info(spec, force=True)
+        if self.phys == "rest" and not self.hanging:
+            self.player.once("reminder")
+        self.todos_changed()
+
+    def todo_summary(self):
+        """A bubble with the first open tasks (also after coming back to the PC)."""
+        items = self.todos.open_items()
+        if not items:
+            self.notice({"kind": "wait", "chip": "To-do", "text": "Nothing to do. Add a task from the menu.",
+                         "buttons": [("Open list", "todo_open", True)]}, seconds=0)
+            return
+        shown = items[:4]
+        lines = [f"- {t['text']}" + (f" ({fmt_due(t['due'])})" if t["due"] else "") for t in shown]
+        if len(items) > len(shown):
+            lines.append(f"+{len(items) - len(shown)} more")
+        buttons = [("Done: " + shown[0]["text"], ("todo_done", shown[0]["id"]), True), ("Open list", "todo_open", False)]
+        self.set_info({"kind": "todo", "chip": "To-do", "right": f"{len(items)} open", "text": "\n".join(lines),
+                       "buttons": buttons, "max_lines": 10}, force=True)
+        if self.phys == "rest" and not self.hanging and not self.cfg["dnd"]:
+            self.player.once("reminder")
 
     def snooze(self):
         if self.info and self.info.get("_text"):
@@ -2132,16 +2276,14 @@ class Smellyfish(QObject):
         if self.cfg.get("weather_place"):
             self.bump("weather_checks")
         if not self.cfg.get("weather_place"):
-            self.set_info({"kind": "wait", "chip": "Weather", "text": "Tell me where you are and I'll show you "
-                                                                       "the weather. Enter a place in the settings.",
-                           "buttons": [("Settings", "settings", True), ("OK", "ok", False)]})
+            self.notice({"kind": "wait", "chip": "Weather", "text": "Tell me where you are and I'll show you "
+                                                                     "the weather. Enter a place in the settings.",
+                         "buttons": [("Settings", "settings", True), ("OK", "ok", False)]}, seconds=0)
             return
-        self.set_info({"kind": "wait", "chip": "Weather", "text": self.weather.text})
+        self.notice({"kind": "wait", "chip": "Weather", "text": self.weather.text})
         kind = self.weather.kind or "cloud"
-        if animate and self.phys == "rest" and not self.player.busy:
+        if animate and self.phys == "rest" and not self.player.busy and not self.hanging:
             self.player.once(WEATHER_ANIM.get(kind, "cloudy"))
-        QTimer.singleShot(10000, lambda: self.set_info(None) if self.info and self.info.get("chip") == "Weather"
-                          else None)
 
     # ------------------------------------------------------------ chase the cursor
     def toggle_chase(self):
@@ -2307,6 +2449,9 @@ class Smellyfish(QObject):
             items.append(("MSG", (88, 101, 242)))
         if self.cfg.get("clicker"):
             items.append((short_count(self.clicks_today()), (70, 130, 110)))
+        late = len(self.todos.overdue(now))
+        if late:
+            items.append((f"DUE {late}" if late > 1 else "DUE", (200, 120, 60)))
         if self.unseen:
             items.append(("!" if self.unseen == 1 else str(min(self.unseen, 99)), (235, 80, 90)))
         if self.hanging:
@@ -2508,6 +2653,16 @@ class Smellyfish(QObject):
         self.info = spec if (force or not self.cfg["dnd"]) else None
         self.refresh_bubble()
 
+    def notice(self, spec, seconds=10):
+        """Answer to something the user asked for (update check, weather...): shown even while the pet sleeps
+        or is in do-not-disturb, unless a game is in the foreground. seconds=0 keeps it until dismissed."""
+        if self.hidden_for_game() or self.interactive:
+            return
+        self.wake()
+        self.set_info(spec, force=True)
+        if seconds:
+            QTimer.singleShot(seconds * 1000, lambda: self.set_info(None, force=True) if self.info is spec else None)
+
     def bubble_kind(self):
         spec = self.interactive[0].spec() if self.interactive else self.info
         return spec["kind"] if spec else None
@@ -2564,6 +2719,15 @@ class Smellyfish(QObject):
             return QTimer.singleShot(0, self.type_answer)
         if value == "snooze":
             return self.snooze()
+        if value == "todo_open":
+            self.set_info(None, force=True)
+            return self.open_todos()
+        if isinstance(value, tuple) and value and value[0] in ("todo_done", "todo_snooze"):
+            self.set_info(None, force=True)
+            if value[0] == "todo_done":
+                return self.todo_set_done(value[1])
+            self.todos.snooze(value[1], 10)
+            return self.todos_changed()
         if value == "settings":
             self.set_info(None)
             return self.open_settings()
@@ -2652,8 +2816,8 @@ class Smellyfish(QObject):
             install_hooks.apply("codex", bool(value))
         elif key == "claude_statusline":
             if not install_hooks.apply_statusline(bool(value)):
-                self.set_info({"kind": "wait", "chip": "Status line", "right": "Claude",
-                               "text": "You already have your own Claude Code status line, so I left it alone."})
+                self.notice({"kind": "wait", "chip": "Status line", "right": "Claude",
+                             "text": "You already have your own Claude Code status line, so I left it alone."})
                 if self.settings_win is not None:
                     self.settings_win.refresh()
         elif key == "autostart":
@@ -2727,6 +2891,8 @@ class Smellyfish(QObject):
             self.toggle_chase()
         elif action == "mini":
             self.toggle_mini()
+        elif action == "todo":
+            self.open_todos()
 
     def build_menu(self):
         m = self.menu
@@ -2767,6 +2933,11 @@ class Smellyfish(QObject):
         play.addAction("Stop chasing the cursor" if time.time() < self.chase_until else "Chase the cursor",
                        self.toggle_chase)
         m.addAction("What's the weather?", self.show_weather)
+        open_n = len(self.todos.open_items())
+        todo = m.addMenu(f"To-do ({open_n} open)" if open_n else "To-do")
+        todo.addAction("Open list...", self.open_todos)
+        todo.addAction("Add a task...", self.quick_todo)
+        todo.addAction("Show open tasks", self.todo_summary)
         pending = len(self.cfg.get("reminders") or [])
         m.addAction(f"Remind me... ({pending} pending)" if pending else "Remind me...", self.add_reminder)
         m.addAction(f"Achievements ({self.life.unlocked_count()})...", self.open_achievements)
@@ -2934,6 +3105,7 @@ class Smellyfish(QObject):
                    "history": lambda: self._open("history_win", HistoryWindow),
                    "discord": lambda: self._open("discord_win", DiscordSetup),
                    "achievements": lambda: self._open("achievements_win", AchievementsWindow),
+                   "todo": lambda: self._open("todo_win", TodoWindow),
                    "reminder": lambda: ReminderDialog(self)}[p["name"]]()
             win.show()
             QTimer.singleShot(600, lambda: (win.grab().save(p["path"]), win.close()))
@@ -3006,10 +3178,10 @@ class Smellyfish(QObject):
     def on_update_ready(self, version):
         text = f"I updated myself to version {version}. Restart now to use it?"
         self.add_history("Smellyfish", "Update", text)
-        if self.quiet_mode():
+        if self.hidden_for_game():
             return
-        self.set_info({"kind": "wait", "chip": "Update", "right": f"v{version}", "text": text,
-                       "buttons": [("Restart", "update_restart", True), ("Later", "ok", False)]})
+        self.notice({"kind": "wait", "chip": "Update", "right": f"v{version}", "text": text,
+                     "buttons": [("Restart", "update_restart", True), ("Later", "ok", False)]}, seconds=0)
 
     # ------------------------------------------------------------ usage limits
     def on_usage_warn(self, source, window, pct, resets, critical=False):
