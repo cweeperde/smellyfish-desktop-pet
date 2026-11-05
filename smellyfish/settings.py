@@ -88,6 +88,7 @@ DEFAULTS = {
     "talk_blips": True,
     "reminders": [],
     "todos": [],
+    "seen_version": "",
     "todo_greet": True,
     "stats": {},
     "achievements": {},
@@ -106,6 +107,7 @@ class Settings(dict):
         self._dirty = set()
         self.readonly = False
         self.on_error = None
+        self.fresh = not os.path.exists(PATH)
         if os.path.exists(PATH):
             data, error = None, None
             for _ in range(40):

@@ -40,6 +40,7 @@ from smellyfish.system.pcmonitor import PcMonitor
 from smellyfish.ui.gallery import DiscordSetup, GalleryWindow, HistoryWindow
 from smellyfish.ui.settings_window import SCHEMA, SettingsWindow
 from smellyfish.ui.todo_window import TodoWindow
+from smellyfish.ui.changelog_window import ChangelogWindow
 
 FEET = sprite.FEET
 BODY_X0, BODY_X1 = sprite.BX + 1, sprite.BX + 15
@@ -514,7 +515,8 @@ class Smellyfish(QObject):
         self.badge = BadgeView(self)
         self.house = HouseView(self)
         self.settings_win = self.gallery_win = self.history_win = self.discord_win = None
-        self.achievements_win = self.todo_win = None
+        self.achievements_win = self.todo_win = self.changelog_win = None
+        self.updated_from = None
         self.cache, self.hang_cache = {}, {}
         self.pose = None
         self.eyes = (0, 0)
@@ -662,6 +664,7 @@ class Smellyfish(QObject):
             self.player.set_base("sleeping")
         if self.cfg.get("mini"):
             QTimer.singleShot(500, self.place_mini)
+        QTimer.singleShot(4000, self.check_whats_new)
 
     # ------------------------------------------------------------ rendering
     def show_pose(self, pose):
@@ -2160,6 +2163,32 @@ class Smellyfish(QObject):
                 self.player.once("reminder")
         QTimer.singleShot(0, self.build_menu)
 
+    # ------------------------------------------------------------ what's new
+    def check_whats_new(self):
+        """After an update, offer the release notes once (not on a fresh install, not while quiet)."""
+        seen = self.cfg.get("seen_version") or ""
+        if seen == __version__:
+            return
+        if not seen and getattr(self.cfg, "fresh", False):
+            return self.cfg.set("seen_version", __version__)
+        if self.quiet_mode() or self.interactive:
+            return
+        self.updated_from = seen or "1.3.1"
+        self.cfg.set("seen_version", __version__)
+        from smellyfish.changelog import since
+        news = since(self.updated_from, __version__)
+        title = news[0]["title"] if news else "Small improvements"
+        self.add_history("Smellyfish", "Updated", f"Now running v{__version__}: {title}")
+        self.notice({"kind": "trophy", "chip": "Updated", "right": f"v{__version__}", "text": title,
+                     "buttons": [("What's new", "whats_new", True), ("OK", "ok", False)]}, seconds=0)
+        if self.phys == "rest" and not self.hanging:
+            self.player.once("happy")
+
+    def open_changelog(self, since_version=None):
+        win = self._open("changelog_win", ChangelogWindow)
+        if since_version:
+            win.show_since(since_version)
+
     # ------------------------------------------------------------ to-do list
     def open_todos(self):
         self._open("todo_win", TodoWindow)
@@ -2719,6 +2748,9 @@ class Smellyfish(QObject):
             return QTimer.singleShot(0, self.type_answer)
         if value == "snooze":
             return self.snooze()
+        if value == "whats_new":
+            self.set_info(None, force=True)
+            return self.open_changelog(self.updated_from)
         if value == "todo_open":
             self.set_info(None, force=True)
             return self.open_todos()
@@ -2941,6 +2973,7 @@ class Smellyfish(QObject):
         pending = len(self.cfg.get("reminders") or [])
         m.addAction(f"Remind me... ({pending} pending)" if pending else "Remind me...", self.add_reminder)
         m.addAction(f"Achievements ({self.life.unlocked_count()})...", self.open_achievements)
+        m.addAction("What's new...", self.open_changelog)
         m.addAction(f"Check for updates (v{__version__})", lambda: self.updater.check(manual=True))
         m.addSeparator()
         for section, items in SCHEMA:
@@ -3106,6 +3139,7 @@ class Smellyfish(QObject):
                    "discord": lambda: self._open("discord_win", DiscordSetup),
                    "achievements": lambda: self._open("achievements_win", AchievementsWindow),
                    "todo": lambda: self._open("todo_win", TodoWindow),
+                   "changelog": lambda: self._open("changelog_win", ChangelogWindow),
                    "reminder": lambda: ReminderDialog(self)}[p["name"]]()
             win.show()
             QTimer.singleShot(600, lambda: (win.grab().save(p["path"]), win.close()))

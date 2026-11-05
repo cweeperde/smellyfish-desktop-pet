@@ -1,0 +1,27 @@
+name: Release notes
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update the text of every release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for v in $(python3 tools/release_notes.py --versions); do
+            python3 tools/release_notes.py "$v" > notes.md
+            if gh release view "v$v" > /dev/null 2>&1; then
+              gh release edit "v$v" --notes-file notes.md
+              echo "updated v$v"
+            else
+              echo "no release v$v, skipped"
+            fi
+          done

@@ -35,7 +35,12 @@ jobs:
       - name: Check the packaged app
         run: python tools/smoke_test.py --exe dist/Smellyfish.exe
 
+      - name: Release notes
+        shell: bash
+        run: python tools/release_notes.py "${GITHUB_REF_NAME#v}" > notes.md
+
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/Smellyfish.exe
-          generate_release_notes: true
+          body_path: notes.md
+          generate_release_notes: false
