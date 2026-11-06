@@ -7,20 +7,20 @@ from PySide6.QtWidgets import QToolTip, QWidget
 from smellyfish.art import sprite
 
 LAMP_ON = [
-    "..gggg...",
-    ".g....g..",
-    ".g...YYY.",
-    ".g..YYYYY",
-    ".g..ooooo",
-    ".g...y.y.",
-    ".g..y...y",
-    ".g.......",
-    ".g.......",
-    ".g.......",
-    ".g.......",
-    ".g.......",
-    "GGG......",
-    "GGGG.....",
+    "...gggggg..",
+    "..g......g.",
+    ".g.....GGG.",
+    ".g....GyyyG",
+    ".g...GYYYYG",
+    ".g...oooooo",
+    ".g....y.y.y",
+    ".g...y.y.y.",
+    ".g.........",
+    ".g.........",
+    ".g.........",
+    ".gh........",
+    "GGGGGG.....",
+    "GGGGGGGG...",
 ]
 LAMP_OFF = [r.replace("Y", "w").replace("o", "h").replace("y", ".") for r in LAMP_ON]
 BED = [
@@ -39,32 +39,38 @@ PLANT_OK = [
     "..TTT..",
 ]
 SIGN_ON = [
-    "bbbbb..",
-    "bbbbbb.",
-    "bbbbb..",
-    "..q....",
-    "..bbbbb",
-    ".bbbbbb",
-    "..bbbbb",
-    "..q....",
-    ".qqq...",
+    "....Y....",
+    "yyyyyy...",
+    "bbbbbbb..",
+    "bbbbbbbb.",
+    "qqqqqqq..",
+    "....q....",
+    "..yyyyyyy",
+    "bbbbbbbbb",
+    "..qqqqqqq",
+    "....q....",
+    "....q....",
+    "..qqqqq..",
 ]
 SIGN_OFF = [
-    ".RRRRR.",
-    "RRRRRRR",
-    "RWWWWWR",
-    "RRRRRRR",
-    ".RRRRR.",
-    "...q...",
-    "...q...",
-    "...q...",
-    "..qqq..",
+    "..RRRRR..",
+    ".RRRRRRR.",
+    "RRRRRRRRR",
+    "RWWWWWWWR",
+    "RWWWWWWWR",
+    "RRRRRRRRR",
+    ".ZZZZZZZ.",
+    "..ZZZZZ..",
+    "....q....",
+    "....q....",
+    "....q....",
+    "..qqqqq..",
 ]
 BED_H = 3                    # the pet sits on the mattress, this many pixels above the floor
 
 # left edge and width (1x pixels) of each prop relative to the home centre; ground is y = 0
-LAYOUT = {"lamp": (-21, 9), "bed": (-9, 18), "plant": (15, 7), "sign": (24, 7)}
-LEFT, WIDTH, HEIGHT = -21, 52, 14
+LAYOUT = {"lamp": (-21, 11), "bed": (-9, 18), "plant": (15, 7), "sign": (24, 9)}
+LEFT, WIDTH, HEIGHT = -21, 54, 14
 PLANT_CENTER = 18
 WATER_SPOT = PLANT_CENTER - 11
 

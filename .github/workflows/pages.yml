@@ -1,0 +1,62 @@
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.d1.outputs.page_url || steps.d2.outputs.page_url || steps.d3.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      # GitHub's deployment step now and then hangs until its own timeout. Try up to three times.
+      - name: Deploy
+        id: d1
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+        with:
+          timeout: 420000
+
+      - name: Deploy (second try)
+        id: d2
+        if: steps.d1.outcome != 'success'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+        with:
+          timeout: 420000
+
+      - name: Deploy (third try)
+        id: d3
+        if: steps.d1.outcome != 'success' && steps.d2.outcome != 'success'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+        with:
+          timeout: 420000
+
+      - name: Fail if every try failed
+        if: steps.d1.outcome != 'success' && steps.d2.outcome != 'success' && steps.d3.outcome != 'success'
+        run: |
+          echo "The page could not be deployed after three tries."
+          exit 1

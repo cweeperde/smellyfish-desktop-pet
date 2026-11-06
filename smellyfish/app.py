@@ -39,7 +39,18 @@ from smellyfish.system.inputcount import InputCounter
 from smellyfish.system.pcmonitor import PcMonitor
 from smellyfish.ui.gallery import DiscordSetup, GalleryWindow, HistoryWindow
 from smellyfish.ui.settings_window import SCHEMA, SettingsWindow
+from smellyfish.ui import theme
 from smellyfish.ui.todo_window import TodoWindow
+from smellyfish.ui.chat_window import ChatWindow
+from smellyfish.ui.ask_window import AskWindow
+from smellyfish.ui.about_window import AboutWindow
+from smellyfish.ui.quick_send import QuickSend
+from smellyfish.ui.edges_overlay import EdgesOverlay
+from smellyfish.integrations.llm import LLM
+from smellyfish.integrations.llm import guide as llm_guide
+from smellyfish.integrations.lan import LanService
+from smellyfish.features.guest import Guests
+from smellyfish.ui.lobby_window import LobbyWindow
 from smellyfish.ui.changelog_window import ChangelogWindow
 
 FEET = sprite.FEET
@@ -95,7 +106,7 @@ def fmt_elapsed(sec, short=False):
 
 ONCE_PRIO = {
     "alarm": 90, "warn": 85, "error": 80, "reminder": 75, "angry": 70, "dizzy": 65, "trophy": 60,
-    "trash_full": 55, "sweep": 55, "water": 55, "land": 5,
+    "trash_full": 55, "zap": 56, "sweep": 55, "water": 55, "land": 5,
     "tickled": 45, "petted": 45, "checkoff": 42, "happy": 40, "sad": 40, "nom": 40, "snack": 40, "camera": 40, "shy": 35,
     "hello": 30, "bye": 30, "stretch": 25,
     "look_around": 10, "bubbles": 10, "read": 10, "sneeze": 10, "yawn": 10, "yoyo": 10, "juggle": 10,
@@ -107,13 +118,18 @@ ROAM_BASES = {"idle", "music", "call", "call_muted", "call_deaf", "hot", "offlin
 ANIM_SOUNDS = {"tickled": "giggle", "petted": "purr", "sweep": "sweep", "water": "splash", "nom": "munch",
                "snack": "munch", "checkoff": "pop", "camera": "shutter", "trophy": "fanfare", "sneeze": "sneeze", "yawn": "yawn",
                "hello": "hello", "bubbles": "pop", "dizzy": "boing", "trash_full": "stink", "sad": "sad",
-               "happy": "happy", "shy": "pop", "paper_plane": "whoosh", "juggle": "jump"}
+               "happy": "happy", "zap": "zap", "shy": "pop", "paper_plane": "whoosh", "juggle": "jump"}
+
+LLM_PHASES = {"starting": "Waking up the model server", "loading": "Loading the model",
+              "answering": "Thinking"}
+
 
 AMBIENT = {"idle", "sleeping", "hot", "offline", "battery_low", "call", "call_muted", "call_deaf", "music", "focus",
            "peek"}
 FIDGETS = ["look_around", "bubbles", "read", "sneeze", "look_around", "yoyo", "juggle", "tea", "gaming",
            "paper_plane", "bubblegum", "doodle"]
 HIDDEN_IN_GALLERY = {"held", "fall", "swim", "climb"}
+CEILING_BASES = {"idle", "music", "call", "call_muted", "call_deaf", "hot", "offline", "battery_low"}
 WEATHER_ANIM = {"rain": "rainy", "sun": "sunny", "snow": "snowy", "cold": "shiver", "cloud": "cloudy"}
 BALL_IDLE_S = 60
 MAIL_S = 8
@@ -131,6 +147,13 @@ def alpha_region(pil):
     a = pil.getchannel("A")
     img = QImage(a.tobytes(), a.width, a.height, a.width, QImage.Format_Alpha8).copy()
     return QRegion(QBitmap.fromImage(img.createAlphaMask()))
+
+
+def bubble_safe(text):
+    """The bubble font only knows Latin-1 plus a few typographic marks, so emoji and the like are dropped."""
+    keep = set("…—–“”„’")
+    text = "".join(ch for ch in (text or "") if ord(ch) <= 255 or ch in keep)
+    return " ".join(text.split(" ")).strip()
 
 
 def summarize(text, limit=600):
@@ -215,16 +238,40 @@ GLYPHS = {
 }
 
 
+BADGE_ICONS = {
+    "timer": ["#####", ".###.", "..#..", ".###.", "#####"],
+    "sessions": ["##.##", "##.##", ".....", "##.##", "##.##"],
+    "clicks": ["#....", "##...", "###..", "####.", "##.#."],
+    "call": [".###.", "#...#", "#...#", "##.##", "##.##"],
+    "msg": ["#####", "##.##", "#.#.#", "#...#", "#####"],
+    "due": [".###.", "#.#.#", "#.###", "#...#", ".###."],
+}
+
+
 def badge_image(items):
-    """items: list of (text, rgb). Returns a 1x RGBA pixel image of pills side by side."""
+    """items: list of (text, rgb[, icon]). Returns a 1x RGBA pixel image of bevelled pills with a little tail."""
     pills = []
-    for text, color in items:
-        w = sum(len(GLYPHS.get(ch, GLYPHS["!"])[0]) + 1 for ch in text) + 3
+    for item in items:
+        text, color = item[0], item[1]
+        icon = BADGE_ICONS.get(item[2]) if len(item) > 2 else None
+        w = sum(len(GLYPHS.get(ch, GLYPHS["!"])[0]) + 1 for ch in text) + 3 + (6 if icon else 0)
         pill = Image.new("RGBA", (w, 9), (0, 0, 0, 0))
         d = ImageDraw.Draw(pill)
+        light = tuple(min(255, c + 45) for c in color) + (255,)
+        dark = tuple(int(c * 0.65) for c in color) + (255,)
         d.rectangle([1, 0, w - 2, 8], fill=color + (255,))
         d.rectangle([0, 1, w - 1, 7], fill=color + (255,))
+        d.line([(1, 0), (w - 2, 0)], fill=light)
+        d.line([(1, 8), (w - 2, 8)], fill=dark)
+        d.line([(0, 7), (0, 1)], fill=light)
+        d.line([(w - 1, 1), (w - 1, 7)], fill=dark)
         x = 2
+        if icon:
+            for gy, row in enumerate(icon):
+                for gx, c in enumerate(row):
+                    if c == "#":
+                        pill.putpixel((2 + gx, 2 + gy), (255, 255, 255, 255))
+            x = 8
         for ch in text:
             for gy, row in enumerate(GLYPHS.get(ch, GLYPHS["!"])):
                 for gx, c in enumerate(row):
@@ -234,11 +281,16 @@ def badge_image(items):
         pills.append(pill)
     if not pills:
         return None
-    img = Image.new("RGBA", (sum(p.width for p in pills) + 2 * (len(pills) - 1), 9), (0, 0, 0, 0))
+    img = Image.new("RGBA", (sum(p.width for p in pills) + 2 * (len(pills) - 1), 12), (0, 0, 0, 0))
     x = 0
     for p in pills:
         img.alpha_composite(p, (x, 0))
         x += p.width + 2
+    tail = tuple(items[-1][1][:3]) + (255,)
+    tx = img.width - 7
+    for k in range(3):
+        for dx in range(5 - 2 * k):
+            img.putpixel((tx + k + dx, 9 + k), tail)
     return img
 
 
@@ -440,8 +492,13 @@ class BadgeView(PixelWindow):
 
     def place(self):
         a = self.app
+        area = a.screen_at(a.cx(), a.feet() - 4).availableGeometry()
         x = round(a.x + (sprite.BX + 5) * a.pix - self.width())
+        if x < area.left() + 2:
+            x = round(a.x + (sprite.BX + 11) * a.pix)
+        x = max(area.left() + 2, min(x, area.right() - self.width() - 1))
         y = round(a.y + (sprite.BY - 4) * a.pix - self.height())
+        y = max(area.top() + 2, y)
         self.move(x, y)
 
     def mousePressEvent(self, e):
@@ -466,26 +523,28 @@ class BubbleView(PixelWindow):
             return
         pix = self.app.pix
         px, py = round(self.app.x), round(self.app.y)
-        screen = QGuiApplication.screenAt(QPoint(px + CENTER_X * pix, py + FEET * pix)) \
-            or QGuiApplication.primaryScreen()
+        screen = self.app.screen_at(px + CENTER_X * pix, py + FEET * pix)
         area = screen.availableGeometry()
         dpr = screen.devicePixelRatio()
         unit = max(1, round(bubble.UNIT * dpr))
         k = bubble.UNIT / unit
         h_est = self.height() if self.image is not None else 200
+        w_est = self.width() if self.image is not None else 250
         head_y = py + (sprite.BY - 1) * pix
         tail = "bottom" if head_y - h_est >= area.top() else "top"
-        if tail != self.tail or self.image is None or self.image.devicePixelRatio() != unit / bubble.UNIT:
-            pil, hits = bubble.render(self.spec, unit, tail)
-            self.tail = tail
+        centre = px + CENTER_X * pix
+        side = "right" if centre - 14 + w_est > area.right() else "left"
+        if (tail, side) != self.tail or self.image is None or self.image.devicePixelRatio() != unit / bubble.UNIT:
+            pil, hits = bubble.render(self.spec, unit, tail, side)
+            self.tail = (tail, side)
             self.image = to_qimage(pil, unit / bubble.UNIT)
             self.hits = [(QRect(round(x0 * k), round(y0 * k), round((x1 - x0) * k), round((y1 - y0) * k)), v)
                          for x0, y0, x1, y1, v in hits]
             self.setFixedSize(round(pil.width * k), round(pil.height * k))
-        x = px + CENTER_X * pix - 14
+        x = centre - 14 if side == "left" else centre + 14 - self.width()
         y = head_y - self.height() if tail == "bottom" else py + (FEET + 1) * pix
-        x = max(area.left(), min(x, area.right() - self.width()))
-        y = max(area.top(), min(y, area.bottom() - self.height()))
+        x = max(area.left(), min(x, area.right() + 1 - self.width()))
+        y = max(area.top(), min(y, area.bottom() + 1 - self.height()))
         self.move(x, y)
         if not self.isVisible():
             self.show()
@@ -515,7 +574,11 @@ class Smellyfish(QObject):
         self.badge = BadgeView(self)
         self.house = HouseView(self)
         self.settings_win = self.gallery_win = self.history_win = self.discord_win = None
-        self.achievements_win = self.todo_win = self.changelog_win = None
+        self.achievements_win = self.todo_win = self.changelog_win = self.chat_win = self.lobby_win = self.ask_win = self.about_win = None
+        self.chat_log = []
+        self.cheers = []
+        self.pending_sends = []
+        self.send_timer = QTimer(self, timeout=self.flush_sends)
         self.updated_from = None
         self.cache, self.hang_cache = {}, {}
         self.pose = None
@@ -539,6 +602,19 @@ class Smellyfish(QObject):
         self.hotkey_conflicts = []
         self.life = Life(self.cfg)
         self.todos = Todos(self.cfg)
+        self.lan = LanService(self)
+        self.guests = Guests(self)
+        self.on_letter_delivered = self.deliver_letter
+        self.lan.look_provider = self.lan_look
+        self.lan.visit.connect(self.on_lan_visit)
+        self.lan.letter.connect(self.on_lan_letter)
+        self.lan.chat.connect(self.on_lan_chat)
+        self.lan.state.connect(lambda _s: QTimer.singleShot(0, self.build_menu))
+        self.llm = LLM(self.cfg, self)
+        self.llm.chunk.connect(self.on_llm_chunk)
+        self.llm.finished.connect(self.on_llm_done)
+        self.llm.phase.connect(self.on_llm_phase)
+        self.llm_phase = ""
         self.weather = Weather(self.cfg)
         self.weather.changed.connect(lambda _k: (self.cache.clear(), self.render()))
         self.weather.status.connect(lambda t: self.settings_win and self.settings_win.set_weather_status(t))
@@ -571,8 +647,10 @@ class Smellyfish(QObject):
         self.theta = self.omega = 0.0
         self.cur_hist, self._last_vx = [], 0.0
         self.hover_since, self.last_shy, self.last_yawn = None, 0.0, time.time()
+        self.badge_peek_until, self.badge_marks, self.badge_hover = 0.0, {}, False
         self.game_hidden = False
         self.swim = None
+        self.ceil, self.ceil_goal = None, None
         self.climb, self.climb_flip = None, False
         self.plan = []
         self.outfit_day, self.outfit = None, None
@@ -582,6 +660,7 @@ class Smellyfish(QObject):
         self.climb_timer = QTimer(self, timeout=self.climb_step)
         self.hang_timer = QTimer(self, timeout=self.hang_step)
         self.perch_timer = QTimer(self, timeout=self.check_perch)
+        self.ceil_timer = QTimer(self, timeout=self.ceiling_step)
         self.eye_timer = QTimer(self, timeout=self.follow_eyes)
         self.quiet = QTimer(self, singleShot=True, timeout=self.on_quiet)
         self.done_timer = QTimer(self, singleShot=True, timeout=self.on_done_timeout)
@@ -635,6 +714,8 @@ class Smellyfish(QObject):
             self.server.debug[name] = (lambda n: lambda p: (self.server.debug_cmd.emit((n, p)), {"queued": True})[1])(
                 name)
 
+        bubble.set_dark(self.cfg["dark_ui"])
+        theme.set_dark(self.cfg["dark_ui"])
         self.menu = QMenu()
         self.build_menu()
         self.tray = None
@@ -673,7 +754,7 @@ class Smellyfish(QObject):
             if self.cfg["discord"] and self.discord.state["in_call"]:
                 QTimer.singleShot(0, self.badge_update)
         self.pose = pose
-        if not self.hanging:
+        if not self.hanging and not self.dangling():
             self.render()
 
     def current_outfit(self):
@@ -684,7 +765,7 @@ class Smellyfish(QObject):
 
     def render(self):
         pose = self.pose
-        if pose is None or self.hanging:
+        if pose is None or self.hanging or self.dangling():
             return
         ex, ey = 0, 0
         if self.cfg["eyes_follow"] and not pose.side and pose.eyes == "open" and pose.ex == 0 and pose.ey == 0 \
@@ -733,11 +814,6 @@ class Smellyfish(QObject):
 
     def on_press(self, kind, n):
         self.presses += n
-        if self.player.mode == "base" and not self.hanging and self.phys == "rest" and not self.cfg["dnd"]                 and self.player.base in ROAM_BASES and not (self.pose and self.pose.side):
-            self.tap_side = 3 - self.tap_side
-            self.tap_until = time.time() + 0.14
-            self.render()
-            QTimer.singleShot(150, self.render)
         if self.presses >= 50:
             self.flush_presses()
         elif self.badge.isVisible() or self.presses % 5 == 0:
@@ -771,8 +847,6 @@ class Smellyfish(QObject):
         headset = None
         if self.cfg["discord"] and d["in_call"]:
             headset = "mic"
-        elif self.music_on():
-            headset = "phones"
         band = self.focus.phase == "focus"
         sweat = bool(self.cfg["react_cpu"] and self.monitor.hot and name != "hot")
         return headset, band, sweat
@@ -815,19 +889,27 @@ class Smellyfish(QObject):
             self.celebrate(title, desc)
 
     def celebrate(self, title, desc):
-        def show():
-            if self.cfg["dnd"] or self.hidden_for_game():
-                self.unseen += 1
-                return self.badge_update()
-            if not self.interactive and not (self.info and self.info.get("kind") == "focus"):
-                self.set_info({"kind": "trophy", "chip": "Achievement", "text": f"{title}! {desc}"})
-                QTimer.singleShot(8000, lambda: self.set_info(None) if self.info and self.info.get(
-                    "kind") == "trophy" else None)
-            if self.phys == "rest" and not self.hanging:
-                self.player.once("trophy")
-            else:
-                self.sfx("fanfare")
-        QTimer.singleShot(1800, show)
+        QTimer.singleShot(1800, lambda: self.cheer(title, desc))
+
+    def cheer(self, title, desc):
+        """Shows an achievement bubble, but never on top of something else the user still has to read."""
+        if self.cfg["dnd"] or self.hidden_for_game():
+            self.unseen += 1
+            return self.badge_update()
+        if self.interactive or self.info:
+            self.cheers.append((title, desc))
+            return
+        self.set_info({"kind": "trophy", "chip": "Achievement", "text": f"{title}! {desc}"})
+        QTimer.singleShot(8000, lambda: self.set_info(None) if self.info and self.info.get(
+            "kind") == "trophy" else None)
+        if self.phys == "rest" and not self.hanging:
+            self.player.once("trophy")
+        else:
+            self.sfx("fanfare")
+
+    def flush_cheers(self):
+        if self.cheers and not self.info and not self.interactive:
+            self.cheer(*self.cheers.pop(0))
 
     # ------------------------------------------------------------ sound
     def fun_sounds_on(self):
@@ -1063,6 +1145,8 @@ class Smellyfish(QObject):
         if x + BODY_X1 * self.pix > vg.right():
             x, self.vx = vg.right() - BODY_X1 * self.pix, -abs(self.vx) * 0.5
         self.x, self.y = x, y
+        if self.ceil_goal is not None and self.vy > -80:
+            return self.attach_ceiling()
         area = self.area()
         if self.y + sprite.BY * self.pix < area.top():
             self.y, self.vy = area.top() - sprite.BY * self.pix, abs(self.vy) * 0.3
@@ -1095,6 +1179,7 @@ class Smellyfish(QObject):
     def land(self, hit):
         self.tick.stop()
         self.target = None
+        self.ceil_goal = None
         impact = self.vy
         self.phys, self.vx, self.vy = "rest", 0.0, 0.0
         self.perch = (hit.hwnd, hit.x0, hit.y) if hit.hwnd else None
@@ -1237,9 +1322,11 @@ class Smellyfish(QObject):
     def jump_to(self, tx, t_feet, flight=0.5, target=None):
         dx = tx - self.cx()
         dyw = t_feet - self.feet()
+        # the target has to be reached while falling, otherwise the pet flies past it and drifts off to the side
+        flight = max(flight, math.sqrt(2 * max(0.0, -dyw) / GRAVITY) + 0.14)
         vx = dx / flight
         vy = (dyw - 0.5 * GRAVITY * flight * flight) / flight
-        self.fall(vx, max(vy, -1900), target)
+        self.fall(vx, max(vy, -2100), target)
 
     def can_roam(self):
         return (self.phys == "rest" and self.cfg["gravity"] and not self.homing and not self.cfg["dnd"]
@@ -1396,6 +1483,8 @@ class Smellyfish(QObject):
             return
         if self.player.base != "idle" and random.random() < 0.35:
             return
+        if self.cfg.get("ceiling_hang") and random.random() < 0.3 and self.hang_from_window():
+            return
         hop_chance = 0.45 if self.perch else 0.6
         if self.perch and isinstance(self.perch[0], tuple) and random.random() < 0.5:
             return self.leave_icon()
@@ -1440,6 +1529,136 @@ class Smellyfish(QObject):
         self.anchor_cx = tx
         self.run_plan(steps)
 
+    def show_edges(self):
+        if getattr(self, "edges_win", None) is None:
+            self.edges_win = EdgesOverlay(self)
+        self.edges_win.start(12)
+
+    def hang_from_window(self, manual=False):
+        """Jump up to the underside of a window and dangle there upside down."""
+        pix, m = self.pix, HALF_W * self.pix
+        cx, feet = self.cx(), self.feet()
+        a = self.screen_at(cx, feet - 4).geometry()
+        drop = (FEET - sprite.BY) * pix
+        options = []
+        for s in self.get_surfaces(fresh=True):
+            if s.icon or s.bottom + drop * 0.8 > a.bottom() or s.bottom < a.top() + 60:
+                continue
+            rise = feet - (s.bottom + drop)
+            if not 20 <= rise <= MAX_JUMP_UP:
+                continue
+            for x in range(int(s.x0 + m + 30), int(s.x1 - m - 30), 40):
+                if abs(x - cx) > 650:
+                    continue
+                if any(c[0] <= x + m and c[2] >= x - m and c[1] <= s.bottom + 2 and c[3] >= s.bottom - 2
+                       for c in s.covers):
+                    continue
+                options.append((s, x, rise))
+        if not options:
+            if manual:
+                self.notice({"kind": "wait", "chip": "Smellyfish", "text": "No window with free space below it that "
+                             "I can reach from here."}, seconds=6)
+            return False
+        s, x, rise = random.choice(options)
+        vy = -math.sqrt(2 * GRAVITY * rise)
+        t = -vy / GRAVITY
+        self.ceil_goal = {"hwnd": s.hwnd, "x": x, "bottom": s.bottom}
+        self.wandering = False
+        self.anchor_cx = x
+        self.fall((x - cx) / t, vy)
+        return True
+
+    def attach_ceiling(self):
+        g, self.ceil_goal = self.ceil_goal, None
+        self.tick.stop()
+        info = surfaces.window_bottom(g["hwnd"])
+        if info is None or not info[0] + 20 < self.cx() < info[1] - 20:
+            return self.fall()
+        self.phys, self.perch = "ceiling", None
+        self.vx = self.vy = 0.0
+        self.ceil = {"hwnd": g["hwnd"], "bottom": info[2], "x0": info[0], "checked": 0.0,
+                     "until": time.time() + random.uniform(10, 24)}
+        if random.random() < 0.5:
+            self.ceil.update(single=True, pivot=[self.cx(), info[2]], nudge=0.0)
+            self.theta, self.omega = random.choice((-0.35, 0.35)), 0.0
+            self.cache.clear()
+            self.ceil_timer.start(TICK_MS)
+            return self.dangle_step(self.ceil)
+        self.move_to(self.x, info[2] - sprite.BY * self.pix)
+        self.player.force("ceiling")
+        self.ceil_timer.start(120)
+
+    def ceiling_step(self):
+        c = self.ceil
+        if c is None or self.phys != "ceiling":
+            self.ceil_timer.stop()
+            return
+        now = time.time()
+        if c.get("single"):
+            self.dangle_step(c)
+            if now - c["checked"] < 0.15:
+                return
+        c["checked"] = now
+        info = surfaces.window_bottom(c["hwnd"])
+        at = c["pivot"][0] if c.get("single") else self.cx()
+        if info is None or not info[0] + 10 < at < info[1] - 10 or self.cfg["dnd"]                 or now > c["until"] or self.player.base not in CEILING_BASES:
+            return self.release_ceiling()
+        x0, _x1, bottom = info
+        if x0 != c["x0"] or bottom != c["bottom"]:
+            if c.get("single"):
+                c["pivot"] = [c["pivot"][0] + x0 - c["x0"], bottom]
+            else:
+                self.move_to(self.x + x0 - c["x0"], bottom - sprite.BY * self.pix)
+            c["x0"], c["bottom"] = x0, bottom
+
+    def dangling(self):
+        return self.phys == "ceiling" and bool(self.ceil and self.ceil.get("single"))
+
+    def dangle_step(self, c):
+        dt = TICK_MS / 1000
+        now = time.time()
+        length = self.hang_length()
+        if now > c["nudge"]:
+            self.omega += random.choice((-1, 1)) * random.uniform(0.8, 1.5)
+            c["nudge"] = now + random.uniform(2.5, 4.5)
+        alpha = -(0.35 * GRAVITY / length) * math.sin(self.theta) - 0.9 * self.omega
+        self.omega += alpha * dt
+        self.theta = max(-1.0, min(1.0, self.theta + self.omega * dt))
+        angle = int(round(math.degrees(self.theta) / 4) * 4)
+        image, region, r = self.hang_frame(int(now * 3) % 6, angle)
+        size = (2 * r + 1) * self.pix
+        if self.view.width() != size:
+            self.view.setFixedSize(size, size)
+        self.view.set_frame(image, region)
+        px, py = c["pivot"]
+        off = round((r + 0.5) * self.pix)
+        self.view.move(round(px) - off, round(py) - off)
+        self.x = px + length * math.sin(self.theta) - CENTER_X * self.pix
+        self.y = py + length * math.cos(self.theta) - (sprite.BY + 4.5) * self.pix
+
+    def leave_dangle(self):
+        c = self.ceil
+        length = self.hang_length()
+        px, py = c["pivot"]
+        vx = length * self.omega * math.cos(self.theta)
+        vy = -length * self.omega * math.sin(self.theta)
+        c["single"] = False
+        self.view.setFixedSize(sprite.CW * self.pix, sprite.CH * self.pix)
+        self.move_to(px + length * math.sin(self.theta) - CENTER_X * self.pix,
+                     py + length * math.cos(self.theta) - (sprite.BY + 4.5) * self.pix)
+        self.cache.clear()
+        return max(-1500, min(1500, vx)), max(-1500, min(1500, vy))
+
+    def release_ceiling(self):
+        self.ceil_timer.stop()
+        vx = vy = 0.0
+        if self.dangling():
+            vx, vy = self.leave_dangle()
+        self.ceil = None
+        if self.phys == "ceiling":
+            self.phys = "rest"
+            self.fall(vx, vy)
+
     def wander_window(self):
         """Go to another window: jump if it is close, otherwise climb up its side."""
         here = self.perch[0] if self.perch else None
@@ -1461,7 +1680,10 @@ class Smellyfish(QObject):
                         plan = self.climb_up_plan(s, x, left)
                         if plan:
                             climbs.append((s, x, plan))
-        if climbs and (not jumps or random.random() < 0.6):
+        if any(not s.icon for s, _ in jumps) or climbs:
+            if random.random() > 0.2:
+                jumps = [j for j in jumps if not j[0].icon]
+        if climbs and (not jumps or random.random() < 0.7):
             s, x, plan = random.choice(climbs)
             self.anchor_cx = x
             self.wandering = True
@@ -1492,6 +1714,9 @@ class Smellyfish(QObject):
         self.trip_timer.start(random.randint(180000, 420000))
 
     def go_home(self):
+        if self.phys == "ceiling":
+            self.release_ceiling()
+            return QTimer.singleShot(1200, self.go_home)
         if self.hanging or self.phys in ("swim", "climb"):
             return
         if self.cfg.get("mini"):
@@ -1614,6 +1839,14 @@ class Smellyfish(QObject):
             self.swim = None
             self.phys = "air"
             self.vx = self.vy = 0.0
+        if self.phys == "ceiling":
+            self.ceil_timer.stop()
+            if self.dangling():
+                self.leave_dangle()
+            self.ceil = None
+            self.phys = "air"
+            self.vx = self.vy = 0.0
+        self.ceil_goal = None
         if self.phys == "air":
             self.tick.stop()
 
@@ -1641,7 +1874,7 @@ class Smellyfish(QObject):
             dressed = sprite.Pose()
             if gear != (None, False, False):
                 dressed = sprite.with_gear(dressed, *gear)
-            dressed = sprite.with_weather(sprite.with_outfit(dressed, outfit), weather)
+            dressed = sprite.with_weather(sprite.with_outfit(dressed, outfit), weather, inv=True)
             img, (px, py) = sprite.hang_image(phase, self.skin_pal(), dressed)
             r = int(math.ceil(max(math.hypot(x - px + 0.5, y - py + 0.5) for x in (0, img.width) for y in
                                   (0, img.height)))) + 1
@@ -1800,6 +2033,9 @@ class Smellyfish(QObject):
                 self.player.once("shy")
         else:
             self.hover_since = None
+        if (self.hover_since is not None) != self.badge_hover:
+            self.badge_hover = self.hover_since is not None
+            self.badge_update()
         if not self.cfg["eyes_follow"]:
             return
         ex0 = self.x + (sprite.BX + 8) * self.pix
@@ -1938,7 +2174,7 @@ class Smellyfish(QObject):
             if self.cfg.get("todo_greet") and self.todos.open_items() and kind == "user_back":
                 QTimer.singleShot(2500, self.todo_nudge)
         elif kind == "plugged" and self.cfg["react_battery"]:
-            self.player.once("charging")
+            self.player.once("zap")
         elif kind == "online_again" and self.cfg["react_network"]:
             self.player.once("happy")
 
@@ -1961,6 +2197,13 @@ class Smellyfish(QObject):
         if self.info and self.info.get("kind") == "focus":
             self.set_info(None, force=True)
         self.update_ambient()
+
+    def start_break(self):
+        self.focus.start("break")
+        if self.info and self.info.get("kind") == "focus":
+            self.set_info(None, force=True)
+        self.update_ambient()
+        QTimer.singleShot(0, self.build_menu)
 
     def on_focus_tick(self):
         self.badge_update()
@@ -2190,6 +2433,224 @@ class Smellyfish(QObject):
             win.show_since(since_version)
 
     # ------------------------------------------------------------ to-do list
+    # ------------------------------------------------------------ LAN lobby
+    def lan_name(self):
+        name = self.cfg.get("lan_name")
+        if not name:
+            name = "Jelly" + str(random.randint(10, 99))
+            self.cfg.set("lan_name", name)
+        return name
+
+    def lan_color(self):
+        c = self.cfg.get("skin_color") or "#c492ec"
+        if self.cfg.get("skin") != "custom":
+            rgb = (sprite.SKINS.get(self.cfg.get("skin") or "lavender") or {}).get("#", (196, 146, 236))
+            c = "#%02x%02x%02x" % tuple(rgb)
+        return c
+
+    def open_lobby(self):
+        self._open("lobby_win", LobbyWindow)
+
+    def lan_look(self):
+        headset = self.gear()[0]
+        return {"o": self.current_outfit(), "w": self.weather.kind if self.cfg["weather"] else None,
+                "h": "mic" if headset == "mic" else None, "b": self.focus.phase == "focus"}
+
+    def on_lan_visit(self, name, color, look=None):
+        if not self.cfg.get("lan_visits"):
+            return
+        self.add_history(name, "Visit", f"{name} came by")
+        if self.quiet_mode():
+            return self.missed(name, "Visit", f"{name} came by")
+        self.guests.add(name, color, None, look)
+
+    def on_lan_letter(self, name, color, text, look=None):
+        self.add_history(name, "Letter", text)
+        if not self.cfg.get("lan_letters"):
+            return
+        if self.quiet_mode():
+            return self.missed(name, "Letter", text)
+        if not self.guests.add(name, color, text, look):
+            self.missed(name, "Letter", text)
+
+    def deliver_letter(self, name, text):
+        self.bump("letters")
+        if self.phys == "rest" and not self.player.busy and not self.hanging:
+            self.player.once("mail")
+        self.notice({"kind": "done", "chip": "Letter", "right": name, "text": text,
+                     "buttons": [("Reply", ("lan_reply", name), True), ("OK", "ok", False)]},
+                    seconds=max(12, min(45, len(text) // 8)))
+        self.notify_sound("message")
+
+    def queue_send(self, kind, **fields):
+        """A letter or visit that hit the cooldown goes out by itself as soon as it is over."""
+        if len(self.pending_sends) >= 5:
+            return False
+        self.pending_sends.append((kind, fields))
+        if not self.send_timer.isActive():
+            self.send_timer.start(500)
+        return True
+
+    def flush_sends(self):
+        for item in list(self.pending_sends):
+            kind, fields = item
+            result = self.lan.send(kind, **fields)
+            if result.startswith("Wait"):
+                continue
+            self.pending_sends.remove(item)
+            label = "Letter" if kind == "letter" else "Visit"
+            self.notice({"kind": "wait", "chip": "Lobby", "text": f"{label} sent." if not result else
+                         f"{label} not sent: {result}"}, seconds=4)
+        if not self.pending_sends:
+            self.send_timer.stop()
+
+    def quick_letter(self, to_name=None):
+        if self.lan.role is None:
+            return
+        dlg = QuickSend(self, "letter", to_name)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+        self.quick_dialog = dlg
+
+    def quick_visit(self):
+        if self.lan.role is None:
+            return
+        dlg = QuickSend(self, "visit")
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+        self.quick_dialog = dlg
+
+    def on_lan_chat(self, name, text):
+        if self.lan.me is not None and name == self.lan.me.name:
+            return
+        self.add_history(name, "Lobby", text)
+        if self.lobby_win is not None and self.lobby_win.isActiveWindow():
+            return
+        self.mail_until = time.time() + MAIL_S
+        self.badge_update()
+        QTimer.singleShot(MAIL_S * 1000 + 200, self.badge_update)
+        if self.quiet_mode():
+            self.unseen += 1
+            return self.badge_update()
+        if self.interactive or (self.info and self.info.get("kind") == "focus"):
+            return
+        spec = {"kind": "discord", "chip": "Lobby", "right": name, "text": text, "max_lines": 4,
+                "buttons": [("Open lobby", "lan_open", True), ("OK", "ok", False)]}
+        self.set_info(spec)
+        self.notify_sound("message")
+        if not self.player.busy and self.player.base in AMBIENT:
+            self.player.once("mail")
+        QTimer.singleShot(9000, lambda: self.set_info(None) if self.info is spec else None)
+
+    # ------------------------------------------------------------ local model
+    def llm_status(self):
+        if not self.cfg.get("llm_enabled"):
+            return "Local model is off (see Settings)."
+        if not self.cfg.get("llm_model"):
+            return "Pick a model in the settings."
+        if self.llm_phase:
+            state = LLM_PHASES[self.llm_phase].lower() + "..."
+        else:
+            state = "loaded and ready" if self.llm.loaded else "sleeping, wakes up when you ask"
+        return f"{self.cfg['llm_model']} ({state})"
+
+    def llm_ready(self):
+        if self.llm.enabled():
+            return True
+        self.notice({"kind": "wait", "chip": "Chat", "text": "Turn on the local model and pick one in "
+                     "the settings first.", "buttons": [("Settings", "settings", True), ("OK", "ok", False)]},
+                    seconds=0)
+        return False
+
+    def open_ask(self):
+        if not self.llm_ready():
+            return
+        if self.ask_win is None:
+            self.ask_win = AskWindow(self)
+        self.llm.preload()
+        self.ask_win.open()
+
+    def open_chat(self):
+        if self.llm_ready():
+            self._open("chat_win", ChatWindow)
+
+    def ask_llm(self, text):
+        self.llm_started = time.time()
+        self.llm_text = ""
+        self.llm_phase = "loading" if not self.llm.loaded else "answering"
+        self.chat_log += [("you", text), ("wait", LLM_PHASES[self.llm_phase])]
+        del self.chat_log[:-60]
+        if self.chat_win is not None:
+            self.chat_win.render()
+        if self.cfg.get("llm_reply") == "bubble":
+            self.notice({"kind": "wait", "chip": "Smellyfish", "text": LLM_PHASES[self.llm_phase] + "..."},
+                        seconds=0)
+        self.player.set_base("ponder" if self.llm_phase == "loading" else "thinking")
+        return self.llm.ask(text)
+
+    def unload_llm(self):
+        if self.llm.unload_now():
+            self.notice({"kind": "wait", "chip": "Smellyfish", "text": "Model unloaded. It wakes up again when you ask."},
+                        seconds=5)
+        else:
+            self.notice({"kind": "wait", "chip": "Smellyfish", "text": "Busy answering, try again in a moment."},
+                        seconds=5)
+        if self.chat_win is not None:
+            self.chat_win.refresh()
+
+    def on_llm_phase(self, rid, phase):
+        if rid != self.llm.rid or self.llm_text:
+            return
+        self.llm_phase = phase
+        self.player.set_base("ponder" if phase in ("starting", "loading") else "thinking")
+        label = LLM_PHASES[phase]
+        if self.chat_log and self.chat_log[-1][0] == "wait":
+            self.chat_log[-1] = ("wait", label)
+        if self.cfg.get("llm_reply") == "bubble" and self.info and self.info.get("chip") == "Smellyfish":
+            self.set_info(dict(self.info, text=label + "..."), force=True)
+        if self.chat_win is not None:
+            self.chat_win.render()
+            self.chat_win.refresh()
+
+    def on_llm_chunk(self, rid, text):
+        self.llm_text = text
+        if self.chat_log:
+            self.chat_log[-1] = ("bot", text)
+        if self.chat_win is not None:
+            self.chat_win.render()
+        if self.cfg.get("llm_reply") == "bubble" and self.info and self.info.get("chip") == "Smellyfish"                 and time.time() - getattr(self, "llm_shown", 0) > 0.25:
+            self.llm_shown = time.time()
+            self.set_info(dict(self.info, text=bubble_safe(text)[-700:], md=True), force=True)
+
+    def on_llm_done(self, rid, text, error):
+        if rid != self.llm.rid:
+            return
+        self.llm.done()
+        self.llm_phase = ""
+        if self.player.base in ("ponder", "thinking") and not any(
+                time.time() - self.sessions.get(sid, 0) < 600 for sid in self.prompt_time):
+            self.player.set_base(self.idle_base())
+        if self.chat_log:
+            self.chat_log[-1] = ("bot", text or error or "...")
+        if self.chat_win is not None:
+            self.chat_win.render()
+            self.chat_win.refresh()
+        if self.cfg.get("llm_reply") != "bubble" and self.chat_win is not None and self.chat_win.isVisible():
+            return
+        shown = bubble_safe(text) or error or "..."
+        if text:
+            buttons = [("Chat", "llm_open", True), ("OK", "ok", False)]
+        else:
+            self.chat_log.append(("help", llm_guide(error, self.cfg.get("llm_model"))))
+            buttons = [("Help", "llm_open", True), ("Settings", "settings", False)]
+        self.notice({"kind": "done" if text else "wait", "chip": "Smellyfish", "text": shown, "md": bool(text),
+                     "buttons": buttons}, seconds=max(10, min(60, len(shown) // 8)) if text else 0)
+        self.notify_sound("message")
+        if text and self.phys == "rest" and not self.player.busy and not self.hanging:
+            self.player.once("happy")
+
     def open_todos(self):
         self._open("todo_win", TodoWindow)
 
@@ -2304,7 +2765,7 @@ class Smellyfish(QObject):
     def show_weather(self, animate=True):
         if self.cfg.get("weather_place"):
             self.bump("weather_checks")
-        if not self.cfg.get("weather_place"):
+        if not self.cfg.get("weather_place") and not self.cfg.get("weather_auto"):
             self.notice({"kind": "wait", "chip": "Weather", "text": "Tell me where you are and I'll show you "
                                                                      "the weather. Enter a place in the settings.",
                          "buttons": [("Settings", "settings", True), ("OK", "ok", False)]}, seconds=0)
@@ -2459,31 +2920,55 @@ class Smellyfish(QObject):
         now = time.time()
         self.sessions = {k: v for k, v in self.sessions.items() if now - v < 1800}
         items = []
+        urgent = []
         if self.focus.phase:
-            items.append((fmt_elapsed(self.focus.remaining, True), (230, 120, 60) if self.focus.phase == "focus" else (90, 170, 110)))
+            items.append((fmt_elapsed(self.focus.remaining, True), (230, 120, 60) if self.focus.phase == "focus"
+                          else (90, 170, 110), "timer"))
+            if self.focus.remaining < 60:
+                urgent.append(len(items) - 1)
         self.prompt_time = {k: v for k, v in self.prompt_time.items() if now - v < 4 * 3600}
         if self.cfg.get("task_timer", True) and self.prompt_time and self.player.base in WORK | {"question"}:
-            items.append((fmt_elapsed(now - min(self.prompt_time.values()), True), (90, 110, 150)))
+            took = now - min(self.prompt_time.values())
+            items.append((fmt_elapsed(took, True), (90, 110, 150), "timer"))
+            if int(took // 300) != self.badge_marks.get("task"):
+                if took >= 300:
+                    self.peek_badges(5)
+                self.badge_marks["task"] = int(took // 300)
+        else:
+            self.badge_marks.pop("task", None)
         if len(self.sessions) >= 2:
-            items.append((str(min(len(self.sessions), 99)), (140, 96, 190)))
+            items.append((str(min(len(self.sessions), 99)), (140, 96, 190), "sessions"))
+        if len(self.sessions) != self.badge_marks.get("sessions", 0):
+            self.badge_marks["sessions"] = len(self.sessions)
+            if self.sessions:
+                self.peek_badges(5)
         d = self.discord.state
         if self.cfg["discord"] and d["in_call"] and not self.player.name.startswith("call"):
             if d["deaf"]:
-                items.append(("DEAF", (200, 60, 70)))
+                items.append(("DEAF", (200, 60, 70), "call"))
             elif d["mute"]:
-                items.append(("MUTE", (200, 60, 70)))
+                items.append(("MUTE", (200, 60, 70), "call"))
             else:
-                items.append(("CALL", (70, 160, 100)))
+                items.append(("CALL", (70, 160, 100), "call"))
         if now < getattr(self, "mail_until", 0):
-            items.append(("MSG", (88, 101, 242)))
+            items.append(("MSG", (88, 101, 242), "msg"))
+            urgent.append(len(items) - 1)
         if self.cfg.get("clicker"):
-            items.append((short_count(self.clicks_today()), (70, 130, 110)))
+            clicks = self.clicks_today()
+            items.append((short_count(clicks), (70, 130, 110), "clicks"))
+            if clicks // 250 != self.badge_marks.get("clicks", clicks // 250):
+                self.peek_badges(4)
+            self.badge_marks["clicks"] = clicks // 250
         late = len(self.todos.overdue(now))
         if late:
-            items.append((f"DUE {late}" if late > 1 else "DUE", (200, 120, 60)))
+            items.append((f"DUE {late}" if late > 1 else "DUE", (200, 120, 60), "due"))
+            urgent.append(len(items) - 1)
         if self.unseen:
             items.append(("!" if self.unseen == 1 else str(min(self.unseen, 99)), (235, 80, 90)))
-        if self.hanging:
+            urgent.append(len(items) - 1)
+        peek = now < self.badge_peek_until or self.hover_since is not None
+        items = [it for i, it in enumerate(items) if peek or i in urgent]
+        if self.hanging or self.phys == "ceiling":
             items = []
         self.badge_items = items
         self.badge.show_items(items)
@@ -2494,6 +2979,9 @@ class Smellyfish(QObject):
             if self.unseen:
                 tip += f" - {self.unseen} missed"
             self.tray.setToolTip(tip)
+
+    def peek_badges(self, seconds):
+        self.badge_peek_until = max(self.badge_peek_until, time.time() + seconds)
 
     def replay(self, entry):
         if self.info and self.info.get("kind") == "focus":
@@ -2524,6 +3012,7 @@ class Smellyfish(QObject):
         if ev == "UserPromptSubmit":
             self.sessions[sid] = time.time()
             self.prompt_time[sid] = time.time()
+            self.peek_badges(5)
         elif ev in ("PreToolUse", "PostToolUse", "PostToolUseFailure") and sid in self.sessions:
             self.sessions[sid] = time.time()
         elif ev in ("Stop", "StopFailure", "SessionEnd", "Interrupt"):
@@ -2704,6 +3193,8 @@ class Smellyfish(QObject):
         new = bool(key) and key != getattr(self, "_last_bubble", None)
         self._last_bubble = key
         self.bubble.set_spec(spec)
+        if not spec and self.cheers:
+            QTimer.singleShot(900, self.flush_cheers)
         if not spec:
             self.blips_left = 0
         elif new and spec.get("kind") != "focus" and self.bubble.isVisible():
@@ -2751,9 +3242,21 @@ class Smellyfish(QObject):
         if value == "whats_new":
             self.set_info(None, force=True)
             return self.open_changelog(self.updated_from)
+        if value == "lan_open":
+            self.set_info(None, force=True)
+            return self.open_lobby()
+        if value == "llm_open":
+            self.set_info(None, force=True)
+            return self.open_chat()
         if value == "todo_open":
             self.set_info(None, force=True)
             return self.open_todos()
+        if isinstance(value, tuple) and value and value[0] == "lan_reply":
+            self.set_info(None, force=True)
+            if self.lan.id_for(value[1]) is None:
+                return self.notice({"kind": "wait", "chip": "Lobby", "text": f"{value[1]} is not in the lobby any "
+                                    "more."}, seconds=5)
+            return self.quick_letter(value[1])
         if isinstance(value, tuple) and value and value[0] in ("todo_done", "todo_snooze"):
             self.set_info(None, force=True)
             if value[0] == "todo_done":
@@ -2841,6 +3344,15 @@ class Smellyfish(QObject):
             return cfg.autostart_enabled()
         return self.cfg.get(key)
 
+    def apply_dark(self, on):
+        bubble.set_dark(on)
+        theme.set_dark(on)
+        if self.ask_win is not None:
+            self.ask_win.key = None
+            self.ask_win.restyle()
+        self.refresh_bubble()
+        QTimer.singleShot(0, self.build_menu)
+
     def apply_setting(self, key, value):
         if key == "hooks":
             install_hooks.apply("user", bool(value))
@@ -2865,15 +3377,18 @@ class Smellyfish(QObject):
                     w.setWindowOpacity(float(value))
             elif key in ("gravity", "sit_on_windows") and self.cfg["gravity"] and self.phys == "rest":
                 self.fall()
+            elif key == "dark_ui":
+                self.apply_dark(value)
             elif key in ("eyes_follow", "seasonal", "skin", "skin_color"):
                 self.cache.clear()
                 self.hang_cache.clear()
                 self.render()
             elif key == "temp_unit":
                 self.weather.render()
-            elif key in ("weather", "weather_place"):
+            elif key in ("weather", "weather_place", "weather_auto", "weather_ip"):
                 self.cache.clear()
-                self.weather.refresh()
+                self.weather.here = None
+                self.weather.refresh(force=True)
                 self.render()
             elif key == "mute_all":
                 sounds.set_muted(value)
@@ -2925,38 +3440,41 @@ class Smellyfish(QObject):
             self.toggle_mini()
         elif action == "todo":
             self.open_todos()
+        elif action == "ask":
+            self.open_ask()
 
     def build_menu(self):
         m = self.menu
         m.clear()
-        title = m.addAction("Smellyfish")
+        title = m.addAction(f"Smellyfish v{__version__}")
         title.setEnabled(False)
-        m.addAction("Settings...", self.open_settings)
+        if self.llm.enabled():
+            m.addAction("Ask Smellyfish...", self.open_ask)
         m.addAction(f"Missed ({self.unseen})..." if self.unseen else "Missed...", self.open_history)
-        m.addAction("Animation tester...", self.open_gallery)
-        m.addSeparator()
-        show = QAction("Show Smellyfish", m, checkable=True, checked=getattr(self, "_visible", True))
-        show.toggled.connect(self.set_visible)
-        m.addAction(show)
-        m.addAction("Go home", self.go_home)
-        m.addAction("Set home here", self.set_home_here)
+        m.addAction("What's the weather?", self.show_weather)
+        open_n = len(self.todos.open_items())
+        m.addAction(f"To-do ({open_n} open)..." if open_n else "To-do...", self.open_todos)
+        pending = len(self.cfg.get("reminders") or [])
+        m.addAction(f"Remind me... ({pending} pending)" if pending else "Remind me...", self.add_reminder)
+        focus = m.addMenu("Focus")
         if self.focus.phase:
-            m.addAction(f"Stop focus timer ({self.focus.phase}, {self.focus.label()} left)", self.toggle_focus)
+            focus.addAction(f"Stop ({self.focus.phase}, {self.focus.label()} left)", self.toggle_focus)
         else:
-            m.addAction(f"Start focus timer ({self.cfg['focus_min']} min)", self.toggle_focus)
+            focus.addAction(f"Start focus ({self.cfg['focus_min']} min)", self.toggle_focus)
+        focus.addAction(f"Take a break now ({self.cfg['break_min']} min)", self.start_break)
+        m.addAction("Lobby (LAN)..." if self.lan.role is None else f"Lobby: {self.lan.lobby_name}...", self.open_lobby)
+        if self.lan.role is not None:
+            m.addAction("Send letter...", self.quick_letter)
+            m.addAction("Visit someone...", self.quick_visit)
+        m.addAction("Go home", self.go_home)
         dnd = QAction("Do not disturb", m, checkable=True, checked=bool(self.cfg["dnd"]))
         dnd.toggled.connect(lambda on: self.apply_setting("dnd", on))
         m.addAction(dnd)
         mute_all = QAction("Mute all sounds", m, checkable=True, checked=bool(self.cfg["mute_all"]))
         mute_all.toggled.connect(lambda on: self.apply_setting("mute_all", on))
         m.addAction(mute_all)
-        mute = QAction("Mute fun sounds", m, checkable=True, checked=not self.cfg["sfx"])
-        mute.toggled.connect(lambda on: self.apply_setting("sfx", not on))
-        m.addAction(mute)
-        mini = QAction("Mini mode", m, checkable=True, checked=bool(self.cfg.get("mini")))
-        mini.toggled.connect(lambda _on: self.toggle_mini())
-        m.addAction(mini)
         m.addSeparator()
+
         play = m.addMenu("Play")
         play.addAction("Give a snack", self.give_snack)
         play.addAction("Throw a ball", self.throw_ball)
@@ -2964,20 +3482,31 @@ class Smellyfish(QObject):
             play.addAction("Put the ball away", self.put_ball_away)
         play.addAction("Stop chasing the cursor" if time.time() < self.chase_until else "Chase the cursor",
                        self.toggle_chase)
-        m.addAction("What's the weather?", self.show_weather)
-        open_n = len(self.todos.open_items())
-        todo = m.addMenu(f"To-do ({open_n} open)" if open_n else "To-do")
-        todo.addAction("Open list...", self.open_todos)
-        todo.addAction("Add a task...", self.quick_todo)
-        todo.addAction("Show open tasks", self.todo_summary)
-        pending = len(self.cfg.get("reminders") or [])
-        m.addAction(f"Remind me... ({pending} pending)" if pending else "Remind me...", self.add_reminder)
-        m.addAction(f"Achievements ({self.life.unlocked_count()})...", self.open_achievements)
-        m.addAction("What's new...", self.open_changelog)
-        m.addAction(f"Check for updates (v{__version__})", lambda: self.updater.check(manual=True))
-        m.addSeparator()
+        play.addAction("Hang from a window", lambda: self.hang_from_window(manual=True))
+        play.addAction("Show detected edges (12 s)", self.show_edges)
+
+        more = m.addMenu("More")
+        more.addAction(f"Achievements ({self.life.unlocked_count()})...", self.open_achievements)
+        more.addAction("Animation tester...", self.open_gallery)
+        more.addSeparator()
+        show = QAction("Show Smellyfish", more, checkable=True, checked=getattr(self, "_visible", True))
+        show.toggled.connect(self.set_visible)
+        more.addAction(show)
+        more.addAction("Set home here", self.set_home_here)
+        mini = QAction("Mini mode", more, checkable=True, checked=bool(self.cfg.get("mini")))
+        mini.toggled.connect(lambda _on: self.toggle_mini())
+        more.addAction(mini)
+        mute = QAction("Mute fun sounds", more, checkable=True, checked=not self.cfg["sfx"])
+        mute.toggled.connect(lambda on: self.apply_setting("sfx", not on))
+        more.addAction(mute)
+        more.addSeparator()
+        more.addAction("What's new...", self.open_changelog)
+
+        quick = m.addMenu("Settings")
+        quick.addAction("Open the settings window...", self.open_settings)
+        quick.addSeparator()
         for section, items in SCHEMA:
-            sub = m.addMenu(section.replace("&", "&&"))
+            sub = quick.addMenu(section.replace("&", "&&"))
             for key, label, choices in items:
                 current = self.get_setting(key)
                 if callable(choices):
@@ -2997,7 +3526,10 @@ class Smellyfish(QObject):
                     a = QAction(label, sub, checkable=True, checked=bool(current))
                     a.toggled.connect(lambda on, k=key: self.apply_setting(k, on))
                     sub.addAction(a)
+
         m.addSeparator()
+        m.addAction("Check for updates", lambda: self.updater.check(manual=True))
+        m.addAction("About Smellyfish...", self.open_about)
         m.addAction("Quit", QApplication.quit)
 
     def _open(self, attr, cls):
@@ -3014,6 +3546,9 @@ class Smellyfish(QObject):
 
     def open_settings(self):
         self._open("settings_win", SettingsWindow)
+
+    def open_about(self):
+        self._open("about_win", AboutWindow)
 
     def open_gallery(self):
         self._open("gallery_win", GalleryWindow)
@@ -3356,6 +3891,9 @@ class Smellyfish(QObject):
         threading.Thread(target=run, daemon=True).start()
 
     def shutdown(self):
+        self.lan.leave()
+        self.guests.clear()
+        self.llm.shutdown()
         self.counter.stop()
         self.flush_presses()
         self.life.save()

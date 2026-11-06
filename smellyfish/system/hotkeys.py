@@ -18,9 +18,10 @@ ACTIONS = [
     ("chase", "Chase the cursor"),
     ("mini", "Mini mode"),
     ("todo", "To-do list"),
+    ("ask", "Chat with the local model"),
 ]
 DEFAULTS = {"toggle": "Ctrl+Alt+F9", "home": "Ctrl+Alt+F10", "dnd": "Ctrl+Alt+F11", "history": "Ctrl+Alt+F12",
-            "focus": "Ctrl+Alt+F8", "chase": "Ctrl+Alt+F7", "mini": "Ctrl+Alt+F6", "todo": "Ctrl+Alt+F5"}
+            "focus": "Ctrl+Alt+F8", "chase": "Ctrl+Alt+F7", "mini": "Ctrl+Alt+F6", "todo": "Ctrl+Alt+F5", "ask": "Ctrl+Alt+F3"}
 
 
 def parse(text):

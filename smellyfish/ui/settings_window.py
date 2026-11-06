@@ -1,8 +1,11 @@
 """Settings window and the shared option schema (also used by the tray menu)."""
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence
-from PySide6.QtGui import QColor
-from PySide6.QtWidgets import (QCheckBox, QColorDialog, QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
+from PySide6.QtGui import QColor, QIcon, QImage, QPixmap
+from PySide6.QtCore import QSize
+from PIL import Image
+from smellyfish.art import sprite
+from PySide6.QtWidgets import (QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox, QGridLayout, QGroupBox, QHBoxLayout,
                                QKeySequenceEdit, QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea, QSlider, QSpinBox,
                                QVBoxLayout, QWidget)
 
@@ -19,6 +22,14 @@ BREAKS = [("3 min", 3), ("5 min", 5), ("10 min", 10), ("15 min", 15)]
 SKIN_CHOICES = [("Lavender", "lavender"), ("Pink", "pink"), ("Blue", "blue"), ("Mint", "mint"),
                 ("Peach", "peach"), ("Custom", "custom")]
 
+def skin_icon(pal):
+    """A little jellyfish in the given skin colours, for the colour list."""
+    img = sprite.render(sprite.Pose(eyes="happy"), 1, pal=pal)
+    img = img.crop((sprite.BX, sprite.BY, sprite.BX + 16, sprite.BY + 13)).resize((48, 39), Image.NEAREST)
+    q = QImage(img.tobytes("raw", "RGBA"), img.width, img.height, QImage.Format_RGBA8888).copy()
+    return QIcon(QPixmap.fromImage(q))
+
+
 def monitor_choices():
     from PySide6.QtGui import QGuiApplication
     out = [("Main screen", "primary")]
@@ -34,15 +45,19 @@ SCHEMA = [
         ("opacity", "Opacity", OPACITIES),
         ("show_house", "Show the house (lamp, bed, plant)", None),
         ("skin", "Color", SKIN_CHOICES),
+        ("dark_ui", "Dark mode", None),
         ("seasonal", "Seasonal outfits", None),
-        ("weather", "Weather outfits (umbrella, sunglasses, scarf)", None),
+        ("weather", "Weather outfits", None),
+        ("weather_auto", "Weather: use my current location", None),
+        ("weather_ip", "Weather: use my IP if location is off", None),
         ("temp_unit", "Temperature", [("°C", "C"), ("°F", "F")]),
     ]),
     ("Movement", [
         ("gravity", "Gravity", None),
         ("sit_on_windows", "Sit on windows", None),
-        ("sit_on_icons", "Sit on desktop icons (only ones with free space above)", None),
+        ("sit_on_icons", "Sit on desktop icons and files", None),
         ("window_hop", "Jump between windows", None),
+        ("ceiling_hang", "Hang upside down under windows", None),
         ("wander", "Hop around by itself", None),
         ("trips_home", "Go home now and then", None),
         ("auto_water", "Water the plant now and then", None),
@@ -54,11 +69,11 @@ SCHEMA = [
         ("perm_in_bubble", "Answer permissions in bubble", None),
         ("done_bubble", "Show summary when done", None),
         ("hooks", "Claude Code hooks (all projects)", None),
-        ("codex_hooks", "Codex hooks (~/.codex/hooks.json)", None),
+        ("codex_hooks", "Codex hooks", None),
         ("task_timer", "Show how long a task is running", None),
         ("usage_warn", "Warn about usage limits", [("Off", 0), ("at 70 %", 70), ("at 80 %", 80), ("at 90 %", 90)]),
         ("usage_critical", "Critical warning at 95 % of a limit", None),
-        ("claude_statusline", "Claude usage via status line (~/.claude)", None),
+        ("claude_statusline", "Claude usage via status line", None),
     ]),
     ("Reactions", [
         ("fidgets", "Little idle actions", None),
@@ -66,31 +81,45 @@ SCHEMA = [
         ("react_battery", "Battery warnings", None),
         ("react_network", "Notice when offline", None),
         ("react_greet", "Say hi when you come back", None),
-        ("todo_greet", "Mention open to-dos when you come back", None),
+        ("todo_greet", "Mention open to-dos on return", None),
         ("react_lock", "React to screen lock", None),
         ("react_night", "Yawn late at night", None),
         ("react_hover", "Blush when you hover over it", None),
         ("react_clipboard", "React to copying and screenshots", None),
         ("trash_watch", "Remind me of a full recycle bin", None),
-        ("clicker", "Count my clicks and key presses (only the number)", None),
-        ("break_nudge", "Suggest a short break after 75 minutes", None),
+        ("clicker", "Count clicks and key presses", None),
+        ("break_nudge", "Suggest a break after 75 minutes", None),
     ]),
     ("Music, games & Discord", [
-        ("react_music", "Dance to music (Spotify / any audio)", None),
-        ("beat_sync", "Dance on the beat (listens to audio output)", None),
-        ("game_mode", "Hide during fullscreen apps and games", None),
+        ("react_music", "Dance to music", None),
+        ("beat_sync", "Dance on the beat", None),
+        ("game_mode", "Hide in fullscreen apps and games", None),
         ("discord", "Headset when in a Discord call", None),
-        ("discord_messages", "Show Discord messages (needs setup)", None),
+        ("discord_messages", "Show Discord messages", None),
     ]),
     ("Sound & focus", [
-        ("mute_all", "Mute all sounds (overrides everything below)", None),
-        ("sound_done", "Notification sound (tasks done, questions, alarms)", None),
+        ("mute_all", "Mute all sounds", None),
+        ("sound_done", "Notification sound", None),
         ("notify_volume", "Notification volume", VOLUMES),
-        ("sfx", "Fun sounds (off in do not disturb and sleep)", None),
+        ("sfx", "Fun sounds", None),
         ("talk_blips", "Babble sounds when it talks", None),
         ("volume", "Fun sound volume", VOLUMES),
         ("focus_min", "Focus time", FOCUS),
         ("break_min", "Break time", BREAKS),
+    ]),
+    ("Local AI chat (Ollama / llama.cpp)", [
+        ("llm_enabled", "Chat with a local model (stays on this PC)", None),
+        ("llm_backend", "Server", [("Ollama", "ollama"), ("llama.cpp server", "llamacpp")]),
+        ("llm_reply", "Show answers in", [("Speech bubble", "bubble"), ("Chat window", "window")]),
+        ("llm_autostart", "Start the model server in the background", None),
+        ("llm_autoload", "Load the model when the chat opens", None),
+        ("llm_idle_min", "Unload the model after", [("2 minutes", 2), ("5 minutes", 5), ("15 minutes", 15),
+                                                      ("30 minutes", 30), ("60 minutes", 60)]),
+        ("llm_unload_on_quit", "Unload the model when Smellyfish quits", None),
+    ]),
+    ("Multiplayer (LAN lobby)", [
+        ("lan_visits", "Let lobby friends visit me", None),
+        ("lan_letters", "Accept letters from a lobby", None),
     ]),
     ("General", [
         ("sleep_after_min", "Fall asleep after", SLEEPS),
@@ -126,6 +155,8 @@ class SettingsWindow(QWidget):
 
         grid = QGridLayout()
         self.sliders = {}
+        slot = 0
+        self.llm_group = None
         for i, (title, items) in enumerate(SCHEMA):
             box = QGroupBox(title.replace("&", "&&"))
             lay = QVBoxLayout(box)
@@ -158,6 +189,7 @@ class SettingsWindow(QWidget):
                     combo.currentIndexChanged.connect(lambda _i, k=key, c=combo: self.changed(k, c.currentData()))
                     row.addWidget(combo, 1)
                     if key == "skin":
+                        combo.setIconSize(QSize(48, 39))
                         pick = QPushButton("Pick...")
                         pick.setObjectName("secondary")
                         pick.clicked.connect(self.pick_color)
@@ -176,7 +208,11 @@ class SettingsWindow(QWidget):
                     lay.addWidget(cb)
                     self.widgets[key] = cb
             lay.addStretch(1)
-            grid.addWidget(box, i // 2, i % 2)
+            if title.startswith("Local AI"):
+                self.llm_group = box
+            else:
+                grid.addWidget(box, slot // 2, slot % 2)
+                slot += 1
 
         keys = QGroupBox("Hotkeys (global)")
         kl = QVBoxLayout(keys)
@@ -215,7 +251,7 @@ class SettingsWindow(QWidget):
         reset_all.clicked.connect(self.reset_keys)
         bottom.addWidget(reset_all)
         kl.addLayout(bottom)
-        grid.addWidget(keys, len(SCHEMA) // 2, len(SCHEMA) % 2)
+        grid.addWidget(keys, slot // 2, slot % 2)
         root.addLayout(grid)
 
         weather = QGroupBox("Weather")
@@ -230,8 +266,115 @@ class SettingsWindow(QWidget):
         wl.addWidget(self.weather_status, 1)
         root.addWidget(weather)
 
+        ai = QGroupBox("Local model")
+        al = QVBoxLayout(ai)
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Address"))
+        self.llm_url = QLineEdit()
+        self.llm_url.setPlaceholderText("default: this PC")
+        self.llm_url.textEdited.connect(lambda t: self.changed("llm_url", t.strip()))
+        row.addWidget(self.llm_url, 1)
+        row.addWidget(QLabel("Model"))
+        self.llm_model = QComboBox()
+        self.llm_model.setEditable(True)
+        self.llm_model.setMinimumWidth(220)
+        self.llm_model.currentTextChanged.connect(lambda t: self.changed("llm_model", t.strip()))
+        row.addWidget(self.llm_model, 1)
+        find = QPushButton("Find models")
+        find.setObjectName("secondary")
+        find.clicked.connect(self.find_models)
+        row.addWidget(find)
+        al.addLayout(row)
+        self.llm_status = QLabel("Only this PC or private network addresses are used. Nothing leaves your network.")
+        self.llm_status.setObjectName("hint")
+        al.addWidget(self.llm_status)
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Program"))
+        self.llm_binary = QLineEdit()
+        self.llm_binary.setPlaceholderText("ollama.exe / llama-server.exe (empty = find it automatically)")
+        self.llm_binary.textEdited.connect(lambda t: self.changed("llm_binary", t.strip()))
+        row.addWidget(self.llm_binary, 1)
+        al.addLayout(row)
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Models folder"))
+        self.llm_folder = QLineEdit()
+        self.llm_folder.setPlaceholderText("llama.cpp only: folder with your .gguf files")
+        self.llm_folder.textEdited.connect(lambda t: self.changed("llm_models_dir", t.strip()))
+        row.addWidget(self.llm_folder, 1)
+        al.addLayout(row)
+        al.addWidget(QLabel("Extra instructions for its personality (optional)"))
+        self.llm_prompt = QLineEdit()
+        self.llm_prompt.setMaxLength(600)
+        self.llm_prompt.setPlaceholderText("e.g. call me captain, reply in German")
+        self.llm_prompt.textEdited.connect(lambda t: self.changed("llm_prompt", t.strip()))
+        al.addWidget(self.llm_prompt)
+        self.adv_button = QPushButton("Advanced model settings  [+]")
+        self.adv_button.setObjectName("secondary")
+        self.adv_button.setCheckable(True)
+        self.adv_button.toggled.connect(self.toggle_advanced)
+        al.addWidget(self.adv_button)
+        self.adv = QWidget()
+        ag = QGridLayout(self.adv)
+        ag.setContentsMargins(0, 0, 0, 0)
+        self.llm_adv = {}
+        rows = [
+            ("llm_max_tokens", "Longest answer (tokens)", "spin", (32, 4000, 10)),
+            ("llm_think", "Thinking", "combo", [("Off (fast)", "off"), ("Model default", "auto"), ("On (slow)", "on")]),
+            ("llm_ctx", "Context size", "combo", [("Model default", 0), ("2048", 2048), ("4096", 4096),
+                                                  ("8192", 8192), ("16384", 16384), ("32768", 32768)]),
+            ("llm_temp", "Creativity", "dspin", (0.0, 1.5, 0.1)),
+            ("llm_history", "Remembered messages", "spin", (0, 20, 1)),
+            ("llm_persona", "Cute jellyfish personality", "check", None),
+        ]
+        for r, (key, label, kind, arg) in enumerate(rows):
+            if kind == "check":
+                w = QCheckBox(label)
+                w.toggled.connect(lambda on, k=key: self.changed(k, on))
+                ag.addWidget(w, r, 0, 1, 2)
+            else:
+                ag.addWidget(QLabel(label), r, 0)
+                if kind == "spin":
+                    w = QSpinBox()
+                    w.setRange(arg[0], arg[1])
+                    w.setSingleStep(arg[2])
+                    w.valueChanged.connect(lambda v, k=key: self.changed(k, v))
+                elif kind == "dspin":
+                    w = QDoubleSpinBox()
+                    w.setRange(arg[0], arg[1])
+                    w.setSingleStep(arg[2])
+                    w.setDecimals(1)
+                    w.valueChanged.connect(lambda v, k=key: self.changed(k, round(v, 1)))
+                else:
+                    w = QComboBox()
+                    for text, value in arg:
+                        w.addItem(text, value)
+                    w.currentIndexChanged.connect(lambda _i, k=key, c=w: self.changed(k, c.currentData()))
+                ag.addWidget(w, r, 1)
+            self.llm_adv[key] = w
+        unload = QPushButton("Unload model now")
+        unload.setObjectName("secondary")
+        unload.clicked.connect(app.unload_llm)
+        ag.addWidget(unload, len(rows), 0, 1, 2)
+        ag.setColumnStretch(1, 1)
+        self.adv.hide()
+        al.addWidget(self.adv)
+        self.llm_panel = QWidget()
+        pl = QVBoxLayout(self.llm_panel)
+        pl.setContentsMargins(0, 0, 0, 0)
+        if self.llm_group is not None:
+            pl.addWidget(self.llm_group)
+        pl.addWidget(ai)
+        self.llm_toggle = QPushButton("Local AI chat (Ollama / llama.cpp)  [+]")
+        self.llm_toggle.setObjectName("secondary")
+        self.llm_toggle.setCheckable(True)
+        self.llm_toggle.toggled.connect(self.toggle_llm)
+        root.addWidget(self.llm_toggle)
+        root.addWidget(self.llm_panel)
+        self.llm_panel.hide()
+        app.llm.models_ready.connect(self.on_models)
+
         tools = QHBoxLayout()
-        for text, fn in (("Animation tester...", app.open_gallery), ("Missed...", app.open_history),
+        for text, fn in (("Lobby (LAN)...", app.open_lobby), ("Animation tester...", app.open_gallery), ("Missed...", app.open_history),
                          ("Achievements...", app.open_achievements), ("Discord setup...", app.open_discord_setup),
                          ("Check for updates", lambda: app.updater.check(manual=True))):
             b = QPushButton(text)
@@ -270,6 +413,21 @@ class SettingsWindow(QWidget):
             slider.setValue(int(self.app.get_setting(key) or 0))
             value_label.setText(f"{slider.value()} %")
         self.place.setText(self.app.get_setting("weather_place") or "")
+        self.llm_url.setText(self.app.get_setting("llm_url") or "")
+        self.llm_prompt.setText(self.app.get_setting("llm_prompt") or "")
+        self.llm_binary.setText(self.app.get_setting("llm_binary") or "")
+        for key, w in self.llm_adv.items():
+            value = self.app.get_setting(key)
+            if isinstance(w, QCheckBox):
+                w.setChecked(value is not False)
+            elif isinstance(w, QComboBox):
+                w.setCurrentIndex(max(0, w.findData(value)))
+            elif isinstance(w, QDoubleSpinBox):
+                w.setValue(float(value or 0))
+            else:
+                w.setValue(int(value or 0))
+        self.llm_folder.setText(self.app.get_setting("llm_models_dir") or "")
+        self.llm_model.setCurrentText(self.app.get_setting("llm_model") or "")
         for key, w in self.widgets.items():
             value = self.app.get_setting(key)
             if isinstance(w, QComboBox):
@@ -277,6 +435,7 @@ class SettingsWindow(QWidget):
             else:
                 w.setChecked(bool(value))
         self.custom.setValue(int(self.app.get_setting("scale")))
+        self.refresh_skin_icons()
         keys = dict(hotkeys.DEFAULTS, **(self.app.get_setting("hotkeys") or {}))
         for action, edit in self.key_edits.items():
             edit.setKeySequence(QKeySequence(keys.get(action, "")))
@@ -285,14 +444,55 @@ class SettingsWindow(QWidget):
                                 "Click a field and press the new key combination.")
         self._loading = False
 
+    def refresh_skin_icons(self):
+        combo = self.widgets.get("skin")
+        if combo is None:
+            return
+        c = (self.pending.get("skin_color") or self.app.get_setting("skin_color") or "#c492ec").lstrip("#")
+        custom = sprite.skin_from_color(tuple(int(c[i:i + 2], 16) for i in (0, 2, 4)))
+        for i in range(combo.count()):
+            value = combo.itemData(i)
+            pal = custom if value == "custom" else sprite.SKINS.get(value)
+            combo.setItemIcon(i, skin_icon(pal))
+
     def pick_color(self):
         color = QColorDialog.getColor(QColor(self.app.get_setting("skin_color") or "#c492ec"), self, "Jellyfish color")
         if color.isValid():
             self.changed("skin_color", color.name())
+            self.refresh_skin_icons()
             self._loading = True
             self.widgets["skin"].setCurrentIndex(self.widgets["skin"].findData("custom"))
             self._loading = False
             self.changed("skin", "custom")
+
+    def toggle_llm(self, on):
+        self.llm_panel.setVisible(on)
+        self.llm_toggle.setText("Local AI chat (Ollama / llama.cpp)  [-]" if on else
+                                "Local AI chat (Ollama / llama.cpp)  [+]")
+
+    def toggle_advanced(self, on):
+        self.adv.setVisible(on)
+        self.adv_button.setText("Advanced model settings  [-]" if on else "Advanced model settings  [+]")
+
+    def find_models(self):
+        for key in ("llm_backend", "llm_url", "llm_binary", "llm_models_dir", "llm_autostart"):
+            self.app.cfg.set(key, self.pending.get(key, self.app.get_setting(key)))
+        self.llm_status.setText("Looking...")
+        self.app.llm.refresh_models()
+
+    def on_models(self, models, error):
+        if error:
+            self.llm_status.setText(f"Could not list models: {error}")
+            return
+        current = self.llm_model.currentText()
+        self._loading = True
+        self.llm_model.clear()
+        self.llm_model.addItems(models)
+        self.llm_model.setCurrentText(current or (models[0] if models else ""))
+        self._loading = False
+        if self.llm_model.currentText() != (self.app.get_setting("llm_model") or ""):
+            self.changed("llm_model", self.llm_model.currentText())
+        self.llm_status.setText(f"{len(models)} model{'s' if len(models) != 1 else ''} found")
 
     def set_weather_status(self, text):
         self.weather_status.setText(text)

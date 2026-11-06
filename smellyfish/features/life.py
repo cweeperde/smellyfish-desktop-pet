@@ -33,6 +33,8 @@ ACHIEVEMENTS = [
     ("todo_25", "Getting things done", "Finished 25 to-dos", "todos_done", 25),
     ("todo_100", "Productivity wizard", "Finished 100 to-dos", "todos_done", 100),
     ("todo_clear_5", "Inbox zero", "Cleared your whole list 5 times", "todo_clears", 5),
+    ("letter_1", "Mailbox", "Received your first letter", "letters", 1),
+    ("letter_10", "Pen pal", "Received 10 letters", "letters", 10),
     ("night_owl", "Night owl", "Still at the computer after 2 am", "night_owl", 1),
     ("clicks_1k", "Warming up", "1,000 clicks and key presses", "clicks", 1000),
     ("clicks_100k", "Clicky fingers", "100,000 clicks and key presses", "clicks", 100000),

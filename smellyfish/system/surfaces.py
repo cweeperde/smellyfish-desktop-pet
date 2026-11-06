@@ -122,7 +122,10 @@ def window_rects(exclude=()):
         r = _rect(hwnd)
         if r.right - r.left < 120 or r.bottom - r.top < 60:
             return True
-        out.append((hwnd, _to_logical(r)))
+        box = _to_logical(r)
+        if any(all(abs(box[i] - o[1][i]) < 2 for i in range(4)) for o in out):
+            return True
+        out.append((hwnd, box))
         return True
 
     user32.EnumWindows(cb, 0)
@@ -164,6 +167,14 @@ def window_top(hwnd):
     return x0, x1, y0
 
 
+def window_bottom(hwnd):
+    """Current logical (x0, x1, bottom y) of a window, or None if it is gone or hidden."""
+    if not IS_WIN or isinstance(hwnd, tuple) or not user32.IsWindow(hwnd) or not user32.IsWindowVisible(hwnd)             or user32.IsIconic(hwnd) or _cloaked(hwnd):
+        return None
+    x0, _y0, x1, y1 = _to_logical(_rect(hwnd))
+    return x0, x1, y1
+
+
 def _qpoint(x, y):
     from PySide6.QtCore import QPoint
     return QPoint(round(x), round(y))
@@ -174,10 +185,12 @@ def _icons():
 
 
 def _find_icon(key):
+    best, best_d = None, 5
     for bounds, glyph in _icons():
-        if (round(bounds[0]), round(glyph[1])) == key[1:]:
-            return bounds, glyph
-    return None
+        d = max(abs(bounds[0] - key[1]), abs(glyph[1] - key[2]))
+        if d < best_d:
+            best, best_d = (bounds, glyph), d
+    return best
 
 
 def icon_bounds(key):
@@ -186,21 +199,19 @@ def icon_bounds(key):
 
 
 def icon_surfaces(foot_w, foot_h, min_room):
-    """Icons wide enough for the pet, with nothing but empty desktop in the space it would fill above them."""
+    """Every desktop item (icons, shortcuts, files, folders) is a place to sit. The surface is at least as wide as
+    the pet, centred on the item."""
     icons = _icons()
     out = []
-    for i, (b, g) in enumerate(icons):
+    for b, g in icons:
         x0, x1, top = b[0], b[2], g[1]
-        if x1 - x0 < foot_w:
-            continue
+        if x1 - x0 < foot_w * 1.7:
+            mid = (x0 + x1) / 2
+            x0, x1 = mid - foot_w * 0.85, mid + foot_w * 0.85
         screen = QGuiApplication.screenAt(_qpoint((x0 + x1) / 2, top + 2))
         if screen is None or top - min_room < screen.availableGeometry().top():
             continue
-        probe = (x0, top - foot_h, x1, top)
-        if any(j != i and ob[0] - 2 < probe[2] and ob[2] + 2 > probe[0] and ob[1] - 2 < probe[3]
-               and ob[3] + 2 > probe[1] for j, (ob, _g) in enumerate(icons)):
-            continue
-        s = Surface(("icon", round(x0), round(top)), x0, x1, top)
+        s = Surface(("icon", round(b[0]), round(top)), x0, x1, top)
         s.bottom, s.icon = b[3], b
         out.append(s)
     return out

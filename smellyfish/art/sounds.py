@@ -136,6 +136,10 @@ SOUNDS = {
     "pop": lambda: _tone([((500, 1100), 0.05)], wave_fn=_sine, decay=25),
     "boing": lambda: [v * 0.8 for v in _tone([((220, 520), 0.35)], wave_fn=lambda f, p: math.sin(
         2 * math.pi * p + 2 * math.sin(2 * math.pi * p * 0.03)), decay=6)],
+    "zap": lambda: _seq(_noise(0.05, decay=30, seed=21), _tone([((1800, 300), 0.08)], wave_fn=_tri, decay=6),
+                        _noise(0.07, decay=20, seed=22), _tone([((1500, 250), 0.1)], wave_fn=_tri, decay=5),
+                        _silence(0.1), _bell([(784, 0.08), (1047, 0.25)], decay=6)),
+    "doorbell": lambda: _bell([(784, 0.2), (622, 0.45)], partials=((1, 1.0), (2, 0.35)), decay=4),
     "whoosh": lambda: _noise(0.3, smooth=0.85, env=lambda x: math.sin(math.pi * x) ** 2),
     "sweep": lambda: _seq(_noise(0.18, smooth=0.7, env=lambda x: math.sin(math.pi * x), seed=4), _silence(0.05),
                           _noise(0.18, smooth=0.7, env=lambda x: math.sin(math.pi * x), seed=5), _silence(0.05),

@@ -18,7 +18,8 @@ PAGE_READWRITE = 0x04
 SMTO_ABORTIFHUNG = 0x2
 MAX_ICONS = 400
 
-_cache = (0.0, [])
+_cache = (0.0, [], 0.0)
+STALE_AFTER = 12.0
 _api = None
 
 
@@ -69,19 +70,23 @@ def _read(to_logical):
     def send(msg, w, lp):
         return u.SendMessageTimeoutW(lv, msg, w, lp, SMTO_ABORTIFHUNG, 80, ctypes.byref(res))
 
-    if not send(LVM_GETITEMCOUNT, 0, 0) or not 0 < res.value <= MAX_ICONS:
+    if not send(LVM_GETITEMCOUNT, 0, 0):
+        return None
+    if res.value == 0:
         return []
+    if res.value > MAX_ICONS:
+        return None
     count = res.value
     pid = wintypes.DWORD(0)
     u.GetWindowThreadProcessId(lv, ctypes.byref(pid))
     proc = k.OpenProcess(PROCESS_VM_ACCESS, False, pid.value)
     if not proc:
-        return []
+        return None
     out = []
     try:
         remote = k.VirtualAllocEx(proc, None, ctypes.sizeof(wintypes.RECT), MEM_COMMIT_RESERVE, PAGE_READWRITE)
         if not remote:
-            return []
+            return None
         try:
             origin = wintypes.POINT(0, 0)
             u.ClientToScreen(lv, ctypes.byref(origin))
@@ -91,7 +96,7 @@ def _read(to_logical):
                     r = wintypes.RECT(code, 0, 0, 0)
                     k.WriteProcessMemory(proc, remote, ctypes.byref(r), ctypes.sizeof(r), None)
                     if not send(LVM_GETITEMRECT, i, remote) or not res.value:
-                        return out
+                        return None
                     k.ReadProcessMemory(proc, remote, ctypes.byref(r), ctypes.sizeof(r), None)
                     pair.append(to_logical(wintypes.RECT(r.left + origin.x, r.top + origin.y,
                                                          r.right + origin.x, r.bottom + origin.y)))
@@ -113,6 +118,10 @@ def desktop_icons(to_logical, max_age=1.5):
         try:
             items = _read(to_logical)
         except Exception:
-            items = []
-        _cache = (now, items)
+            items = None
+        if items is None:
+            items = _cache[1] if now - _cache[2] < STALE_AFTER else []
+            _cache = (now, items, _cache[2])
+        else:
+            _cache = (now, items, now)
     return _cache[1]

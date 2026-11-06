@@ -138,7 +138,7 @@ class TodoWindow(QWidget):
                 font.setStrikeOut(True)
                 it.setForeground(QColor(theme.MUTED))
             elif t["due"] and t["due"] <= now:
-                it.setForeground(QColor("#ff8a8a"))
+                it.setForeground(QColor(theme.BAD))
             it.setFont(font)
             self.list.addItem(it)
             if t["id"] == keep:

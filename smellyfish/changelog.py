@@ -5,6 +5,73 @@ Kinds: "new", "better", "fix".
 KINDS = {"new": "New", "better": "Improved", "fix": "Fixed"}
 
 CHANGELOG = [
+    {"version": "1.4.0", "date": "2026-11-05", "title": "Lobby, chat and a zap", "items": [
+        ("new", "LAN lobby: create or join a lobby with a password, chat, send letters and let friends visit. "
+                "They step out of a door in their own colors and outfit and hand over the "
+                "letter. Everything is encrypted and has cooldowns. Nothing runs until you open a lobby."),
+        ("new", "Optional chat with your own Ollama or llama.cpp model: short, cute answers in a speech bubble or "
+                "a chat window (Ctrl+Alt+F3). The model loads when needed and unloads when idle."),
+        ("new", "A cartoon electric shock with an X-ray skeleton when you plug in the charger."),
+        ("new", "It now and then hangs upside down under a window, either with all tentacles or from just one, "
+                "and sways a little. Switch it off under Movement."),
+        ("better", "Timers, the click counter and other badges are bevelled with little icons and only show "
+                   "up when something changes or when you point at the jellyfish."),
+        ("better", "It prefers windows over desktop icons and no longer drops off an icon when Windows is slow "
+                   "to answer."),
+        ("new", "Dark mode (Settings > Appearance): speech bubbles, the input bubble, menus, dialogs and title "
+                "bars all go dark."),
+        ("new", "The colour list in the settings shows a little jellyfish in each colour."),
+        ("new", "A small pixel input bubble next to the jellyfish for the local chat. It starts Ollama or "
+                "llama.cpp quietly in the background when needed and shows when the model is waking up."),
+        ("better", "The right-click menu is tidier: weather, to-do, reminders, focus, lobby and go home on top, "
+                   "the settings in a submenu, the rest under More."),
+        ("new", "About window (right-click menu) with the creator and the GitHub contributors. The exe now carries "
+                "its author and version in the file properties."),
+        ("new", "Weather can use your current location (Windows location service) or, if you allow it, a rough "
+                "position from your IP address."),
+        ("new", "Code blocks in answers are drawn as code in the speech bubble."),
+        ("new", "Advanced model settings (answer length, thinking, context size, creativity, memory) are tucked "
+                "into a collapsible block. The chat has an Unload model button and explains common problems."),
+        ("new", "Right-click > Play > Hang from a window, to see the upside-down hang on demand."),
+        ("better", "Dark mode is on by default. A new, clearer signpost. Short reactions play slower so you can "
+                   "actually see them. Mouse and key clicks are only counted now and no longer animate."),
+        ("fix", "Every desktop item (shortcuts, files, folders) can be sat on, not only icons with free space above."),
+        ("fix", "Speech bubbles, badges and the input bubble stay fully on screen at every edge; the bubble tail "
+                "flips to the other side when the jellyfish is near the right edge."),
+        ("fix", "Jumps are aimed so the jellyfish lands on the target while falling. Before, high jumps could fly "
+                "past a window or icon."),
+        ("better", "Hanging under windows needs less free space and no longer fails because of windows in front. "
+                   "Identical overlapping windows are counted once."),
+        ("better", "New lamp. The input bubble has a wide text field with the buttons underneath, the chat window "
+                   "too. The local model settings are collapsed by default."),
+        ("better", "Every window now has a proper light and dark version (settings, lobby, chat, to-do, about, "
+                   "notes, banners) and switches instantly with the dark mode setting."),
+        ("better", "The jellyfish dangles from one tentacle as often as it hangs by all of them. The settings "
+                   "page fits without cutting off the right column."),
+        ("new", "While you are in a lobby the right-click menu offers Send letter and Visit someone with a quick "
+                "picker. The Reply button on a letter now opens a letter to the sender."),
+        ("fix", "A reply (or any letter or visit) sent during the cooldown is queued and goes out by itself when "
+                "the cooldown is over, instead of being dropped."),
+        ("fix", "An achievement bubble no longer covers a letter or message you have not read yet. It waits until "
+                "the other bubble is gone."),
+        ("new", "Lobby chat messages pop up in a speech bubble like Discord ones, with a mail animation and a badge."),
+        ("better", "A visitor's name sits centred right above their head, hat or umbrella included. The lobby "
+                   "window shows the encryption status."),
+        ("new", "Lobby owners can remove people (the owner has a little crown). The password is hidden by default "
+                "with Show and Copy buttons, and it is only asked when you press Join."),
+        ("new", "Lobbies check the Smellyfish version so everybody is compatible; the list shows each version."),
+        ("fix", "Your own lobby password is used now (it needs at least 4 characters). Before, a short one was "
+                "silently replaced by a random one."),
+        ("fix", "Lobbies are announced on every network card, not just one, and the Refresh button asks hosts to "
+                "answer right away. Before, a virtual adapter (WSL, VPN, Hyper-V) could swallow the announcement."),
+        ("better", "The lobby window is tidier once you are inside and shows the address friends can type."),
+        ("new", "Right-click > Play > Show detected edges draws the edges the jellyfish stands on (green windows, "
+                "yellow desktop items) for 12 seconds, handy when something looks off."),
+        ("better", "The lobby list has a Refresh button."),
+        ("fix", "Models that think before answering (like Qwen) now answer instead of staying silent."),
+        ("better", "Music only makes it dance now; the headset stays for Discord calls."),
+        ("better", "The hanging pose keeps the scarf pointing down."),
+    ]},
     {"version": "1.3.2", "date": "2026-11-05", "title": "What's new", "items": [
         ("new", "After an update the jellyfish tells you and shows what changed. You can open this window "
                 "any time from the tray menu."),

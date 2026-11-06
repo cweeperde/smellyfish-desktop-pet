@@ -1,5 +1,10 @@
-"""Current weather from Open-Meteo (free, no key). Only the place you type is sent."""
+"""Current weather from Open-Meteo (free, no key). Only the place (or the coordinates) are sent.
+
+The place can be typed, taken from the Windows location service or, when that is off and you allow it,
+estimated from your IP address by an online lookup (ipwho.is)."""
 import json
+import subprocess
+import sys
 import threading
 import time
 import urllib.parse
@@ -15,6 +20,42 @@ def _get(url):
     req = urllib.request.Request(url, headers={"User-Agent": "Smellyfish desktop pet"})
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())
+
+
+LOCATE_SCRIPT = (
+    "Add-Type -AssemblyName System.Device; "
+    "$w = New-Object System.Device.Location.GeoCoordinateWatcher; $w.Start(); $n = 0; "
+    "while ($w.Status -ne 'Ready' -and $n -lt 40) { Start-Sleep -Milliseconds 250; $n++ }; "
+    "$p = $w.Position.Location; if ($p.IsUnknown) { exit 1 }; "
+    "$c = [cultureinfo]::InvariantCulture; \"$($p.Latitude.ToString($c)),$($p.Longitude.ToString($c))\"")
+
+
+def device_location():
+    """Latitude and longitude from the Windows location service, or None when it is off or unavailable."""
+    if sys.platform != "win32":
+        return None
+    try:
+        out = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", LOCATE_SCRIPT],
+                             capture_output=True, text=True, timeout=14, creationflags=0x08000000)
+        lat, lon = out.stdout.strip().split(",")
+        lat, lon = float(lat), float(lon)
+        if -90 <= lat <= 90 and -180 <= lon <= 180 and out.returncode == 0:
+            return {"lat": lat, "lon": lon, "name": "Here"}
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    return None
+
+
+def ip_location():
+    """Rough position from the public IP address (an online lookup, only when the user allowed it)."""
+    try:
+        data = _get("https://ipwho.is/?fields=success,latitude,longitude,city")
+        if data.get("success"):
+            return {"lat": float(data["latitude"]), "lon": float(data["longitude"]),
+                    "name": data.get("city") or "Here"}
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return None
 
 
 def classify(code, temp, is_day):
@@ -41,18 +82,33 @@ class Weather(QObject):
         self.kind = None
         self.text = "Off"
         self.cur, self.loc_name, self.fetched_at, self.fetched_for = None, None, 0.0, None
+        self.here, self.here_at = None, 0.0
         self.timer = QTimer(self, timeout=self.refresh)
         self.timer.start(30 * 60 * 1000)
         QTimer.singleShot(3000, self.refresh)
 
     def refresh(self, force=False):
-        if not self.cfg.get("weather_place"):
+        if not self.cfg.get("weather_place") and not self.cfg.get("weather_auto"):
             self._set(None, "Enter a place")
             return
-        fresh = time.time() - self.fetched_at < 10 * 60 and self.fetched_for == self.cfg["weather_place"]
+        fresh = time.time() - self.fetched_at < 10 * 60 and self.fetched_for == self.source()
         if fresh and not force:
             return self.render()
         threading.Thread(target=self._fetch, daemon=True).start()
+
+    def source(self):
+        return "here" if self.cfg.get("weather_auto") else self.cfg.get("weather_place")
+
+    def locate(self):
+        """Where the user is right now (cached for 30 minutes). None when nothing worked."""
+        if self.here and time.time() - self.here_at < 30 * 60:
+            return self.here
+        found = device_location()
+        if found is None and self.cfg.get("weather_ip"):
+            found = ip_location()
+        if found:
+            self.here, self.here_at = found, time.time()
+        return found
 
     def render(self):
         if not self.cur:
@@ -72,9 +128,15 @@ class Weather(QObject):
 
     def _fetch(self):
         try:
-            place = self.cfg["weather_place"]
-            loc = self.cfg.get("weather_loc")
-            if not loc or loc.get("q") != place:
+            place = self.cfg.get("weather_place")
+            loc = None
+            if self.cfg.get("weather_auto"):
+                loc = self.locate()
+                if loc is None and not place:
+                    return self._set(None, "Location is off. Turn it on in Windows or allow the IP lookup.")
+            if loc is None:
+                loc = self.cfg.get("weather_loc")
+            if loc is None or ("q" in loc and loc.get("q") != place):
                 res = _get("https://geocoding-api.open-meteo.com/v1/search?count=1&name="
                            + urllib.parse.quote(place)).get("results") or []
                 if not res:
@@ -85,7 +147,7 @@ class Weather(QObject):
             cur = _get(f"https://api.open-meteo.com/v1/forecast?latitude={loc['lat']}&longitude={loc['lon']}"
                        "&current=temperature_2m,relative_humidity_2m,weather_code,is_day")["current"]
             self.cur, self.loc_name = cur, loc["name"]
-            self.fetched_at, self.fetched_for = time.time(), place
+            self.fetched_at, self.fetched_for = time.time(), self.source()
             self.render()
         except Exception as e:
             self._set(self.kind, f"Weather unavailable ({e.__class__.__name__})")

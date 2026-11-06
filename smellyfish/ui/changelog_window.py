@@ -9,14 +9,16 @@ from smellyfish.art import sprite
 from smellyfish.changelog import CHANGELOG, KINDS
 from smellyfish.ui import theme
 
-TAG = {"new": theme.LAV, "better": "#82e696", "fix": "#ffd250"}
+def tags():
+    return {"new": theme.HEAD, "better": theme.GOOD, "fix": theme.WARN}
 
 
 def render(entries, current):
+    TAG = tags()
     out = []
     for e in entries:
         now = f" <span style='color:{theme.MUTED}'>(you are here)</span>" if e["version"] == current else ""
-        out.append(f"<p style='margin:14px 0 2px 0'><span style='color:{theme.LIGHT}; font-size:17px; "
+        out.append(f"<p style='margin:14px 0 2px 0'><span style='color:{theme.HEAD}; font-size:17px; "
                    f"font-weight:bold'>v{escape(e['version'])}</span>{now}<br>"
                    f"<span style='color:{theme.MUTED}'>{escape(e['date'])}  -  {escape(e['title'])}</span></p>")
         rows = "".join(
@@ -32,6 +34,7 @@ class ChangelogWindow(QWidget):
         self.app = app
         self.setWindowTitle("Smellyfish - What's new")
         theme.apply(self, app)
+        theme.listen(lambda: self.refresh() if hasattr(self, "view") else None)
         self.resize(560, 600)
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 12)

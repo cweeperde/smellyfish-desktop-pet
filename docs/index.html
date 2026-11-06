@@ -134,12 +134,12 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
       <div>
         <p class="kicker">Desktop pet // Windows 10 &middot; 11</p>
         <h1>SMELLY<span class="accent">FISH</span><span class="ext">.exe</span></h1>
-        <p>A tiny pixel jellyfish that floats around your desktop, sits on your windows and keeps an eye on
+        <p>A tiny pixel jellyfish that floats around your desktop, sits on your windows (or hangs under them) and keeps an eye on
           Claude Code, Codex and your PC. It answers questions in little speech bubbles, cooks up your code and
           naps in its own bed when there's nothing to do.</p>
         <div class="prompt">&gt; Smellyfish.exe</div>
         <div class="actions">
-          <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest">Download</a>
+          <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.exe" download>Download</a>
           <a class="btn ghost" href="https://github.com/cweeperde/smellyfish-desktop-pet">Source code</a>
         </div>
       </div>
@@ -160,12 +160,14 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
     <div class="body">
       <h2>What it gets up to</h2>
       <ul class="log">
-        <li><b>window hopping</b><span>sits on visible window edges, jumps between them and climbs their sides</span></li>
+        <li><b>window hopping</b><span>sits on visible window edges, jumps between them, climbs their sides and now and then hangs upside down under one</span></li>
         <li><b>grab &amp; throw</b><span>dangles from a tentacle, swings, flies, lands with a squish</span></li>
         <li><b>a home</b><span>lamp for do-not-disturb, a bed, a plant that tells you the weather</span></li>
-        <li><b>pc reactions</b><span>busy CPU, music, Discord calls, full recycle bin, games in fullscreen</span></li>
+        <li><b>pc reactions</b><span>busy CPU, dances to music, Discord calls, full recycle bin, games in fullscreen, a cartoon zap when you plug in the charger</span></li>
         <li><b>head pats</b><span>pet its head or tickle its tentacles with your cursor</span></li>
         <li><b>toys &amp; trophies</b><span>a ball to fetch, fish snacks, focus timer and achievements</span></li>
+        <li><b>local chat</b><span>talk to your own Ollama or llama.cpp model; short, cute answers in a speech bubble, nothing leaves your PC</span></li>
+        <li><b>lan lobby</b><span>friends on your network step out of a door, drop by in their own colors and outfits and hand over letters, all encrypted</span></li>
       </ul>
       <img class="shot" style="margin-top:22px" src="media/animations.gif" alt="Animation overview">
     </div>
@@ -195,21 +197,37 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
     <div class="body">
       <h2>Little helpers</h2>
       <p>Discord mute and deafen status, messages, the weather at its plant, a focus timer, usage warnings,
-        a nudge when the recycle bin overflows, achievements and reminders.</p>
-      <img class="shot" src="media/features.gif" alt="Discord status, weather, focus timer, usage limits, recycle bin, achievements, task timer and reminders">
+        a nudge when the recycle bin overflows, achievements and reminders. Timers and counters only pop up
+        when something changes or when you point at the jellyfish.</p>
+      <img class="shot" src="media/features.gif" alt="Discord status, weather, focus timer, usage limits, recycle bin, achievements, task timer, reminders, charging zap, hanging upside down, local chat and lobby visits">
     </div>
   </section>
 
-  <section id="get" class="win paper tilt-l">
+  <section id="visits" class="win tilt-l">
+    <div class="bar"><span class="dot"></span>visit.gif<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
+    <div class="body">
+      <h2>Friends drop by</h2>
+      <p>Open a lobby on your network and friends can join with a password. Their jellyfish steps out of a door
+        in their own colors and outfit, waves, and can hand over a letter. Chat, visits and letters are
+        encrypted and never leave your network. Optional, and nothing runs until you open a lobby.</p>
+      <img class="shot" src="media/visit.gif" alt="A friend's jellyfish steps out of a door and hands over a letter">
+      <p class="caption">There is also a chat with your own local Ollama or llama.cpp model: short, cute answers
+        in a speech bubble, code drawn as code, and the model unloads itself when idle. Everything comes in a dark
+        and a light look.</p>
+    </div>
+  </section>
+
+  <section id="get" class="win paper tilt-r">
     <div class="bar"><span class="dot"></span>download.txt<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
     <div class="body">
       <h2 style="color:var(--ink)">Get it</h2>
       <ol class="steps">
-        <li>Download <b>Smellyfish.exe</b> from the latest release.</li>
+        <li>Download <b>Smellyfish.exe</b> (the button starts the download of the latest version).</li>
         <li>Run it. One portable file, nothing to install.</li>
         <li>Right-click it in the tray to open the settings.</li>
       </ol>
-      <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest">Download latest &rarr;</a>
+      <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.exe" download>Download latest &rarr;</a>
+      <a class="btn ghost" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases">All releases</a>
       <p class="trust">Talks to Claude Code and Codex only on your own PC (127.0.0.1). Hooks are only added
         when you switch them on. Updates come from this repository's releases and are checked before they are
         installed.</p>
@@ -224,6 +242,7 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
   <a href="#tricks">tricks.log</a>
   <a href="#watch">claude_codex.sys</a>
   <a href="#extras">helpers.gif</a>
+  <a href="#visits">visit.gif</a>
   <a href="#get">download</a>
   <span class="clock" id="clock"></span>
 </nav>

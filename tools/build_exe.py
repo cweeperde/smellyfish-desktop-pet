@@ -35,13 +35,38 @@ def make_icon(path):
     square.save(os.path.join(BUILD, "icon_preview.png"))
 
 
+def make_version_file(path):
+    """Windows file properties of the exe: author, product, version."""
+    from smellyfish import __version__, REPO
+    nums = tuple(int(p) for p in __version__.split(".")[:3]) + (0,)
+    strings = {
+        "CompanyName": "cweeper",
+        "FileDescription": "Smellyfish - a pixel jellyfish desktop pet",
+        "FileVersion": ".".join(map(str, nums)),
+        "InternalName": "Smellyfish",
+        "LegalCopyright": "Copyright (c) 2026 cweeper. All rights reserved.",
+        "OriginalFilename": "Smellyfish.exe",
+        "ProductName": "Smellyfish",
+        "ProductVersion": __version__,
+        "Comments": f"Created by cweeper - https://github.com/{REPO}",
+    }
+    items = ", ".join(f"StringStruct({k!r}, {v!r})" for k, v in strings.items())
+    text = (f"VSVersionInfo(ffi=FixedFileInfo(filevers={nums}, prodvers={nums}, mask=0x3f, flags=0x0, OS=0x40004, "
+            f"fileType=0x1, subtype=0x0, date=(0, 0)), kids=[StringFileInfo([StringTable('040904B0', [{items}])]), "
+            "VarFileInfo([VarStruct('Translation', [1033, 1200])])])\n")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
 def main():
     os.makedirs(BUILD, exist_ok=True)
+    version = os.path.join(BUILD, "version_info.txt")
+    make_version_file(version)
     icon = os.path.join(BUILD, "smellyfish.ico")
     make_icon(icon)
 
     relay_dist = os.path.join(BUILD, "relay_dist")
-    pyinstaller("--onedir", "--console", "--name", "smellyfish-relay", "--icon", icon,
+    pyinstaller("--onedir", "--console", "--name", "smellyfish-relay", "--icon", icon, "--version-file", version,
                 "--distpath", relay_dist, "--workpath", os.path.join(BUILD, "relay_work"),
                 "--specpath", BUILD, os.path.join(ROOT, "smellyfish", "integrations", "hook_relay.py"))
     relay_zip = os.path.join(BUILD, "relay.zip")
@@ -52,7 +77,7 @@ def main():
                 full = os.path.join(folder, f)
                 z.write(full, os.path.relpath(full, src))
 
-    pyinstaller("--onefile", "--noconsole", "--name", "Smellyfish", "--icon", icon,
+    pyinstaller("--onefile", "--noconsole", "--name", "Smellyfish", "--icon", icon, "--version-file", version,
                 "--add-data", f"{relay_zip}{os.pathsep}.",
                 "--collect-all", "soundcard",
                 "--exclude-module", "tkinter", "--exclude-module", "matplotlib",

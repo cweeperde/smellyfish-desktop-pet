@@ -42,7 +42,7 @@ PAL = {
     "X": (232, 86, 86), "x": (250, 150, 140), "Z": (168, 48, 60), "U": (88, 101, 242),
     "q": (110, 72, 50), "e": (60, 40, 70), "a": (255, 160, 60),
 }
-TINTS = {"red": {"#": "X", "L": "x", "D": "Z"}}
+TINTS = {"red": {"#": "X", "L": "x", "D": "Z"}, "xray": {"#": "n", "L": "n", "D": "n", "O": "n"}}
 
 LAPTOP = {
     "open": [
@@ -193,6 +193,7 @@ class Pose:
         self.mouth = None
         self.band = False
         self.flip = False
+        self.flipv = False
         self.parts = []
         self.wear = []
         self.__dict__.update(kw)
@@ -310,6 +311,8 @@ def layers(p):
     if p.tint:
         t = TINTS[p.tint]
         out = [(x, y, t.get(c, c)) if i < n_body else (x, y, c) for i, (x, y, c) in enumerate(out)]
+    if p.flipv:
+        out = [(x, 2 * BY + 12 - y, c) for x, y, c in out if 0 <= 2 * BY + 12 - y < CH]
     if p.lift:
         out = [(x, y + p.lift, c) for x, y, c in out]
     if p.flip:
@@ -450,6 +453,24 @@ def thinking():
         loop.append((p, 280))
         if t == 2:
             loop.append((p.but(eyes="blink"), 90))
+    return {"intro": [(Pose(curvy=True, ex=1, ey=-1, parts=[(["W"], 17, BY - 1)]), 120)], "loop": loop}
+
+
+def load_bar(n):
+    return ["wwwwwwwwwww", "w" + "c" * n + "." * (9 - n) + "w", "wwwwwwwwwww"]
+
+
+def ponder():
+    """Waiting for the local model to wake up: thought cloud with cycling dots and a loading bar."""
+    loop = []
+    base = Pose(curvy=True, ex=1, ey=-1)
+    cx, cy = 20, BY - 7
+    trail = [(["W"], 17, BY - 1), (["WW", "WW"], 18, BY - 3)]
+    for t in range(12):
+        n = t % 4
+        cloud = [(CLOUD, cx, cy)] + [(["B"], cx + 2 + 2 * k, cy + 2) for k in range(n)]
+        bar = (load_bar(min(9, t + 1 if t < 9 else 9)), 22, BY + 6)
+        loop.append((base.but(tp=wave(t), parts=trail + cloud + [bar], dy=-1 if t % 6 >= 3 else 0), 260))
     return {"intro": [(Pose(curvy=True, ex=1, ey=-1, parts=[(["W"], 17, BY - 1)]), 120)], "loop": loop}
 
 
@@ -648,6 +669,57 @@ def charging():
     return {"intro": intro, "loop": []}
 
 
+PLUG = ["...hh", "qqHHH", "...hh"]
+BOLT_L = ["..Y", ".Y.", "YY.", ".YY", ".Y."]
+SKULL = [
+    "...WWWWWWWWWW...",
+    "..WWWWWWWWWWWW..",
+    ".WWWWWWWWWWWWWW.",
+    ".WWnnnWWWWnnnWW.",
+    ".WWnnnWWWWnnnWW.",
+    ".WWWWWWnnWWWWWW.",
+    "..WWWWWWWWWWWW..",
+    "...WnWnWnWnWnW..",
+    "................",
+    "...W..W..W..W...",
+    "...W..W..W..W...",
+    "...W..W..W..W...",
+]
+
+
+def zap():
+    intro = []
+    for i in range(4):
+        intro.append((Pose(eyes="wide", ey=-1, tent="tuck" if i > 1 else "straight",
+                           parts=[(PLUG, BX + 24 - i * 2, BY + 4)]), 150))
+    for t in range(10):
+        bones = t % 2 == 0
+        jitter = (-1, 1)[t % 2]
+        sparks = [(BOLT_L, BX - 3, BY - 2 + t % 3), (BOLT, BX + 17, BY - 3 - t % 2), (BOLT_L, BX + 5 + t % 3, BY - 5)]
+        parts = [(PLUG, BX + 17, BY + 4)] + sparks
+        if bones:
+            parts = [(SKULL, BX, BY)] + parts
+        intro.append((Pose(eyes="x", dx=jitter, arm_f=("up_l", "up_r"), tent="spread", tint="xray" if bones else None,
+                           parts=parts), 70))
+    smoke = [(STEAM[0], BX + 4, BY - 4), (STEAM[1], BX + 9, BY - 5)]
+    intro.append((Pose(eyes="x", tent="limp", tint="red", parts=smoke), 220))
+    intro.append((Pose(eyes="blink", tent="limp", parts=smoke), 220))
+    for lvl in range(1, 6):
+        intro.append((Pose(eyes="happy", ey=1, parts=[(battery(lvl, "c"), BX + 17, BY + 1)]), 150))
+    intro.append((Pose(eyes="happy", dy=-2, tent="long", arm_f=("up_l", "up_r")), 120))
+    intro.append((Pose(eyes="happy"), 200))
+    return {"intro": intro, "loop": []}
+
+
+def ceiling():
+    base = Pose(flipv=True, curvy=True)
+    sway = [(0, "straight"), (1, "right"), (1, "right"), (0, "straight"), (-1, "left"), (-1, "left")]
+    loop = []
+    for k, (dx, tent) in enumerate(sway):
+        loop.append((base.but(dx=dx, tent=tent, eyes="blink" if k == 3 else "open", ey=1), 520))
+    return {"intro": [(base.but(ey=1, tent="spread"), 160), (base.but(ey=1), 160)], "loop": loop}
+
+
 def offline():
     loop = []
     for t in range(8):
@@ -777,9 +849,9 @@ def music():
     for t in range(8):
         notes = [(NOTE if (t // 2) % 2 == 0 else NOTE2, BX + 17 + t % 2, BY - 3 - t % 3)]
         arms = ("up_l", "rest_r") if t % 4 < 2 else ("rest_l", "up_r")
-        loop.append((Pose(headset="phones", eyes="happy" if t % 4 else "open", dy=-(t % 2),
+        loop.append((Pose(eyes="happy" if t % 4 else "open", dy=-(t % 2),
                           tent=("left", "straight", "right", "straight")[t % 4], arm_f=arms, parts=notes), 220))
-    return {"intro": [(Pose(headset="phones"), 200)], "loop": loop, "outro": [(Pose(), 150)]}
+    return {"intro": [(Pose(), 200)], "loop": loop, "outro": [(Pose(), 150)]}
 
 
 # ---------------------------------------------------------------- idle fidgets
@@ -1165,6 +1237,17 @@ def with_gear(p, headset=None, band=False, sweat=False):
     return p.but(**kw) if kw else p
 
 
+SCARF_INV = [
+    "............Z.Z.",
+    "............XWZ.",
+    "............XXZ.",
+    "............XWZ.",
+    ".ZZZZZZZZZZZZZZ.",
+    ".XXWXXXWXXXWXXX.",
+    ".xxxxxxxxxxxxxx.",
+]
+WEATHER_INV = dict(WEATHER, cold=[(SCARF_INV, 0, 2)], snow=[(SCARF_INV, 0, 2), WEATHER["snow"][1]])
+
 WEATHER_SIDE = {
     "sun": [(SHADES_SIDE, 0, 3)],
     "rain": WEATHER["rain"],
@@ -1173,12 +1256,12 @@ WEATHER_SIDE = {
 }
 
 
-def with_weather(p, kind):
+def with_weather(p, kind, inv=False):
     """Weather clothes (umbrella, sunglasses, scarf). They go with headphones and the focus band too;
     only the sleeping cap replaces them."""
     if not kind or p.cap:
         return p
-    table = WEATHER_SIDE if p.side else WEATHER
+    table = WEATHER_SIDE if p.side else WEATHER_INV if (inv or p.flipv) else WEATHER
     if kind not in table:
         return p
     if kind == "sun" and (p.eyes not in ("open", "blink") or p.headset == "mic"):
@@ -1616,10 +1699,10 @@ def land():
                       (Pose(dy=-1, tent="long"), 70), (Pose(), 120)], "loop": []}
 
 
-ANIMATIONS = {"idle": idle, "working": working, "thinking": thinking, "question": question, "done": done,
+ANIMATIONS = {"ponder": ponder, "idle": idle, "working": working, "thinking": thinking, "question": question, "done": done,
               "sleeping": sleeping, "error": error, "happy": happy, "sad": sad,
               "held": held, "fall": fall, "land": land,
-              "hot": hot, "battery_low": battery_low, "charging": charging, "offline": offline,
+              "hot": hot, "battery_low": battery_low, "charging": charging, "zap": zap, "ceiling": ceiling, "offline": offline,
               "hello": hello, "yawn": yawn, "dizzy": dizzy, "shy": shy,
               "call": call, "call_muted": lambda: call("muted"), "call_deaf": lambda: call("deaf"),
               "music": music, "look_around": look_around, "bubbles": bubbles, "read": read,
@@ -1634,8 +1717,27 @@ ANIMATIONS = {"idle": idle, "working": working, "thinking": thinking, "question"
               "paper_plane": paper_plane, "bubblegum": bubblegum, "doodle": doodle}
 
 
+# how much slower the short reactions play so they can be seen without staring at the pet
+SLOWER = {"look_around": 1.8, "bubbles": 1.7, "sneeze": 1.8, "yawn": 1.4, "stretch": 1.4, "yoyo": 1.9,
+          "juggle": 1.8, "gaming": 1.6, "paper_plane": 1.8, "bubblegum": 1.7, "doodle": 1.7, "hello": 1.6,
+          "bye": 1.6, "shy": 1.6, "dizzy": 1.4, "camera": 1.6, "mail": 1.5, "reminder": 1.4, "tickled": 1.6,
+          "petted": 1.2, "trophy": 1.5, "tea": 1.2, "read": 1.1, "water": 1.2, "snack": 1.3, "nom": 1.3,
+          "happy": 1.4, "checkoff": 1.5, "zap": 1.3}
+
+
+def slow_down(anim, k):
+    for seg in ("intro", "loop", "outro"):
+        if anim.get(seg):
+            anim[seg] = [(p, max(130, int(ms * k))) for p, ms in anim[seg]]
+    return anim
+
+
 def build_all():
-    return {name: fn() for name, fn in ANIMATIONS.items()}
+    anims = {name: fn() for name, fn in ANIMATIONS.items()}
+    for name, k in SLOWER.items():
+        if name in anims:
+            slow_down(anims[name], k)
+    return anims
 
 
 def full(anim):
