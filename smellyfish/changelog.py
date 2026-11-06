@@ -5,6 +5,13 @@ Kinds: "new", "better", "fix".
 KINDS = {"new": "New", "better": "Improved", "fix": "Fixed"}
 
 CHANGELOG = [
+    {"version": "1.5.1", "date": "2026-11-06", "title": "Contributors and licenses", "items": [
+        ("new", "The About window shows contributors with their GitHub profile pictures. It asks GitHub only "
+                "when you open it, and the window says so."),
+        ("new", "A Licenses button in the About window lists the license of Smellyfish and of the "
+                "open-source libraries it uses."),
+        ("better", "Pull requests are welcome now. The license explains how contributions work."),
+    ]},
     {"version": "1.5.0", "date": "2026-11-06", "title": "Playing Smellyfish", "items": [
         ("new", "Discord Rich Presence: friends see \"Playing Smellyfish\" with a little jellyfish, whether it is "
                 "napping, out for a walk or watching Claude or Codex work, and a button to adopt their own. "

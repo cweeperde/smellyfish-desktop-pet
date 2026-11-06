@@ -79,6 +79,8 @@ def main():
 
     pyinstaller("--onefile", "--noconsole", "--name", "Smellyfish", "--icon", icon, "--version-file", version,
                 "--add-data", f"{relay_zip}{os.pathsep}.",
+                "--add-data", f"{os.path.join(ROOT, 'LICENSE')}{os.pathsep}.",
+                "--add-data", f"{os.path.join(ROOT, 'THIRD_PARTY_NOTICES.txt')}{os.pathsep}.",
                 "--collect-all", "soundcard",
                 "--exclude-module", "tkinter", "--exclude-module", "matplotlib",
                 "--paths", ROOT,

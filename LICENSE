@@ -16,6 +16,7 @@ review the source code and verify what the program does.
       running them on your own computers for personal, non-commercial use.
 
 2. Not permitted without prior written permission from the copyright holder
+   (except for contributions as described in section 4)
    a) Copying, reproducing or redistributing the Software or any part of it,
       in source or binary form.
    b) Modifying the Software or creating derivative works, including reusing
@@ -26,7 +27,37 @@ review the source code and verify what the program does.
 
 3. No other rights are granted, whether by implication, estoppel or otherwise.
 
-4. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+4. Contributions
+   a) You may fork this repository on GitHub and modify your fork solely to
+      prepare and submit a pull request to this repository. This does not
+      allow you to distribute, publish or run modified builds for any other
+      purpose.
+   b) By submitting a pull request, patch, artwork or any other contribution,
+      you confirm that you wrote it yourself or have the right to submit it,
+      and that it contains no third-party code or assets unless you state
+      their source and license in the pull request.
+   c) You keep the copyright in your contribution, but you grant the copyright
+      holder a perpetual, worldwide, irrevocable, royalty-free, sublicensable
+      and transferable right to use, copy, modify, publish, distribute and
+      otherwise exploit your contribution, in whole or in part, as part of the
+      Software and under any license the copyright holder chooses, including
+      commercially.
+   d) You receive no rights to the rest of the Software, no ownership of it and
+      no compensation. The copyright holder may accept, change, reject or
+      remove any contribution at any time.
+   e) You agree that your GitHub username and profile picture may be shown as
+      a contributor in the repository and in the program's About window.
+
+5. Third-party components
+   The program contains open-source components (for example Qt for Python,
+   licensed under the LGPL-3.0). They stay under their own licenses, listed in
+   THIRD_PARTY_NOTICES.txt and in the program's About window. Nothing in this
+   license limits the rights you have under those licenses, including the right
+   to replace the LGPL-licensed libraries and to reverse engineer the program as
+   far as needed to debug such a replacement. This does not extend to the
+   Smellyfish code, artwork, name or logo themselves.
+
+6. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
    COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING

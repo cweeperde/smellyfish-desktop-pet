@@ -60,6 +60,7 @@ Smellyfish is meant to be easy to trust, which is why the source is public.
 - **Every failure is harmless.** If the app is closed or something goes wrong, Claude Code and Codex behave as if Smellyfish wasn't there.
 - **The lobby is opt-in and local.** Nothing listens until you create or join a lobby. Traffic is password-protected and encrypted (X25519 + ChaCha20-Poly1305), rate-limited, and never leaves your network. The local chat only talks to your own PC or a private address.
 - **Network use is minimal and optional.** Weather comes from [Open-Meteo](https://open-meteo.com) only when you enter a place. Updates are fetched from this repository's releases and checked against GitHub's SHA-256 digest. Discord features only talk to the Discord app on your own PC. The optional "Playing Smellyfish" status is switched on by default, can be turned off in the settings, and only shares short generic lines.
+- **The About window talks to GitHub.** Only when you open it, Smellyfish asks `api.github.com` for the contributor list and downloads the profile pictures from `avatars.githubusercontent.com`. GitHub sees your IP address like on any website. Nothing else is sent and nothing is saved to disk.
 - **Your data stays yours.** Settings live in `%APPDATA%\Smellyfish`.
 
 ## Project layout
@@ -80,8 +81,12 @@ tools/build_exe.py    how the release exe is built
 
 Parts of the code were written, modified or assisted by AI.
 
+## Contributing
+
+Pull requests with fixes, ideas and new features are welcome. Please open an issue first for bigger changes. By submitting a pull request you agree to section 4 of the [license](LICENSE): you keep your copyright, grant the project the right to use your contribution, and your GitHub name and picture may appear in the app's About window.
+
 ## License
 
-Copyright © 2026 cweeper. All rights reserved. The code is public so you can read and review it; see [LICENSE](LICENSE) for what is and isn't allowed.
+Copyright © 2026 cweeper. All rights reserved. The code is public so you can read and review it; see [LICENSE](LICENSE) for what is and isn't allowed. Open-source libraries used by the program (Qt for Python under the LGPL-3.0, Pillow, NumPy and others) stay under their own licenses, see [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) or the About window.
 
 Smellyfish is an independent project and is not affiliated with Anthropic, OpenAI or Discord.
