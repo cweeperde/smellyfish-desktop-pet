@@ -79,6 +79,7 @@ DEFAULTS = {
     "trash_reported_at": 0,
     "discord": True,
     "discord_messages": True,
+    "discord_presence": True,
     "discord_client_id": "",
     "discord_client_secret": "",
     "discord_redirect": "http://localhost",

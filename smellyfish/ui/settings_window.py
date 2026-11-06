@@ -96,6 +96,7 @@ SCHEMA = [
         ("game_mode", "Hide in fullscreen apps and games", None),
         ("discord", "Headset when in a Discord call", None),
         ("discord_messages", "Show Discord messages", None),
+        ("discord_presence", "Show \"Playing Smellyfish\" on Discord", None),
     ]),
     ("Sound & focus", [
         ("mute_all", "Mute all sounds", None),

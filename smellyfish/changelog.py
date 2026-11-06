@@ -5,6 +5,13 @@ Kinds: "new", "better", "fix".
 KINDS = {"new": "New", "better": "Improved", "fix": "Fixed"}
 
 CHANGELOG = [
+    {"version": "1.5.0", "date": "2026-11-06", "title": "Playing Smellyfish", "items": [
+        ("new", "Discord Rich Presence: friends see \"Playing Smellyfish\" with a little jellyfish, whether it is "
+                "napping, out for a walk or watching Claude or Codex work, and a button to adopt their own. "
+                "Switch it off under Music, games & Discord."),
+        ("better", "The presence only shares short, generic lines. No project names, prompts, calls, music or "
+                   "anything else personal, and nothing leaves your PC except through your Discord app."),
+    ]},
     {"version": "1.4.0", "date": "2026-11-05", "title": "Lobby, chat and a zap", "items": [
         ("new", "LAN lobby: create or join a lobby with a password, chat, send letters and let friends visit. "
                 "They step out of a door in their own colors and outfit and hand over the "

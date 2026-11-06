@@ -59,7 +59,7 @@ Smellyfish is meant to be easy to trust, which is why the source is public.
 - **Nothing changes without asking.** Claude Code / Codex hooks and the optional status line are only written when you switch them on in the settings, and a backup of your config is made first. Switching them off removes exactly what was added.
 - **Every failure is harmless.** If the app is closed or something goes wrong, Claude Code and Codex behave as if Smellyfish wasn't there.
 - **The lobby is opt-in and local.** Nothing listens until you create or join a lobby. Traffic is password-protected and encrypted (X25519 + ChaCha20-Poly1305), rate-limited, and never leaves your network. The local chat only talks to your own PC or a private address.
-- **Network use is minimal and optional.** Weather comes from [Open-Meteo](https://open-meteo.com) only when you enter a place. Updates are fetched from this repository's releases and checked against GitHub's SHA-256 digest. Discord features only use your own Discord app on your own PC.
+- **Network use is minimal and optional.** Weather comes from [Open-Meteo](https://open-meteo.com) only when you enter a place. Updates are fetched from this repository's releases and checked against GitHub's SHA-256 digest. Discord features only talk to the Discord app on your own PC. The optional "Playing Smellyfish" status is switched on by default, can be turned off in the settings, and only shares short generic lines.
 - **Your data stays yours.** Settings live in `%APPDATA%\Smellyfish`.
 
 ## Project layout

@@ -27,6 +27,7 @@ from smellyfish.features.focus import FocusTimer
 from smellyfish.features.life import Life
 from smellyfish.features.todos import Todos, fmt_due
 from smellyfish.integrations import install_hooks
+from smellyfish.integrations import discord_presence
 from smellyfish.integrations.discord_watch import DiscordWatch
 from smellyfish.integrations.server import HookServer, ask_answer, permission_answer
 from smellyfish.integrations.usage import UsageWatch
@@ -594,6 +595,11 @@ class Smellyfish(QObject):
         self.discord.rpc_status.connect(self.on_discord_status)
         self.discord.message.connect(self.on_discord_message)
         self.discord_status_text = "Connected" if self.cfg.get("discord_token") else "Not connected"
+        self.presence = discord_presence.DiscordPresence()
+        self.presence_started = time.time()
+        self.last_who = "Claude"
+        self.presence_timer = QTimer(self, timeout=self.update_presence)
+        self.presence_timer.start(5000)
         self.focus = FocusTimer(self.cfg)
         self.focus.phase_end.connect(self.on_focus_end)
         self.focus.changed.connect(self.on_focus_tick)
@@ -2885,6 +2891,13 @@ class Smellyfish(QObject):
     def disconnect_discord(self):
         self.discord.disconnect()
 
+    def update_presence(self):
+        if not self.cfg.get("discord_presence"):
+            return self.presence.update(None)
+        base = "idle" if self.llm_phase else self.player.base
+        details, state = discord_presence.lines(base, self.last_who, self.cfg["dnd"], bool(self.wandering))
+        self.presence.update(discord_presence.activity(details, state, self.presence_started))
+
     def on_discord_status(self, text):
         self.discord_status_text = text
         if self.discord_win is not None:
@@ -3009,6 +3022,7 @@ class Smellyfish(QObject):
         ev = payload.get("hook_event_name")
         sid = payload.get("session_id")
         who = source_name(payload)
+        self.last_who = who
         if ev == "UserPromptSubmit":
             self.sessions[sid] = time.time()
             self.prompt_time[sid] = time.time()
@@ -3394,6 +3408,8 @@ class Smellyfish(QObject):
                 sounds.set_muted(value)
             elif key == "dnd":
                 self.set_dnd(value)
+            elif key == "discord_presence":
+                self.update_presence()
             elif key == "clicker":
                 self.sync_clicker()
             elif key == "monitor":
@@ -3891,6 +3907,7 @@ class Smellyfish(QObject):
         threading.Thread(target=run, daemon=True).start()
 
     def shutdown(self):
+        self.presence.stop()
         self.lan.leave()
         self.guests.clear()
         self.llm.shutdown()
