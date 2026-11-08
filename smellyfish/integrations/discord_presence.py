@@ -13,11 +13,11 @@ from smellyfish.integrations.discord_watch import Pipe
 APP_ID = "1568222328326987776"
 ASSET = "jelly"
 SITE = "https://cweeperde.github.io/smellyfish-desktop-pet/"
-TIP = "Smellyfish - a tiny jellyfish for your desktop"
+TIP = "Smellyfish - a pixel jellyfish for your desktop"
 MIN_GAP = 15.0
 RETRY = 30.0
 
-IDLE_LINES = ["Floating around", "Blowing little bubbles", "Being a tiny jellyfish", "Soaking up the sunshine"]
+IDLE_LINES = ["Floating around", "Blowing bubbles", "Being a jellyfish", "Soaking up the sunshine"]
 IDLE_STATE = "Blub blub"
 
 WORK = {"thinking", "search", "terminal", "browse", "todo", "working", "cooking"}
@@ -33,7 +33,7 @@ def lines(base, who="Claude", dnd=False, walking=False, now=None):
     if base in WORK:
         return WORK_LINE[0].format(who=who), WORK_LINE[1]
     if walking:
-        return "Going for a little walk", IDLE_STATE
+        return "Going for a walk", IDLE_STATE
     slot = int((time.time() if now is None else now) // 300) % len(IDLE_LINES)
     return IDLE_LINES[slot], IDLE_STATE
 

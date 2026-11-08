@@ -5,9 +5,10 @@ import os
 import weakref
 
 from PIL import Image, ImageDraw, ImageFont
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import QAbstractSlider, QAbstractSpinBox, QApplication, QComboBox, QLabel, QScrollArea, QScrollBar
+from PySide6.QtWidgets import (QAbstractSlider, QAbstractSpinBox, QApplication, QComboBox, QLabel, QLayout,
+                               QScrollArea, QScrollBar, QSizePolicy)
 
 from smellyfish.art import sprite
 from smellyfish.paths import HOME_DIR
@@ -58,10 +59,11 @@ QCheckBox:unchecked {{ color: {MUTED}; }}
 QCheckBox::indicator {{ width: 14px; height: 14px; border: 3px solid {DEEP}; background: {FIELD}; }}
 QCheckBox::indicator:hover {{ border-color: {LAV}; }}
 QCheckBox::indicator:checked {{ background: {LAV}; border-color: {LIGHT}; image: url(CHECK_PNG); }}
-QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit, QKeySequenceEdit, QTextEdit, QPlainTextEdit {{
+QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit, QKeySequenceEdit, QTextEdit, QPlainTextEdit, QDateEdit, QTimeEdit {{
     background: {FIELD}; color: {TEXT}; border: 3px solid {DEEP}; border-top-color: {EDGE};
     border-left-color: {EDGE}; padding: 4px 8px; selection-background-color: {DARK}; selection-color: #ffffff; }}
-QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QLineEdit:focus, QKeySequenceEdit:focus {{
+QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QLineEdit:focus, QKeySequenceEdit:focus, QDateEdit:focus,
+QTimeEdit:focus {{
     border-color: {LAV}; }}
 QComboBox::drop-down {{ border: none; width: 22px; }}
 QComboBox::down-arrow {{ image: url(ARROW_PNG); width: 10px; height: 6px; }}
@@ -88,6 +90,9 @@ QPushButton#secondary {{ background: {SEC}; color: {TEXT}; border-top-color: {SE
                          border-bottom-color: {SEC_BOT}; border-right-color: {SEC_BOT}; }}
 QPushButton#secondary:hover {{ background: {SEC_HOVER}; }}
 QPushButton:disabled {{ background: {SEC}; color: {MUTED}; border-color: {SEC_TOP}; }}
+QPushButton[menu="1"] {{ padding-right: 30px; }}
+QPushButton::menu-indicator {{ image: url(ARROW_PNG); width: 10px; height: 6px; subcontrol-origin: padding;
+                               subcontrol-position: right center; right: 10px; }}
 QPushButton#chip {{ background: {PANEL}; color: {HEAD}; padding: 4px 10px; border: 3px solid {DEEP}; }}
 QPushButton#chip:hover {{ background: {DEEP}; }}
 QSlider::groove:horizontal {{ height: 8px; background: {FIELD}; border: 2px solid {DEEP}; }}
@@ -281,3 +286,86 @@ def banner(title, subtitle="", pose=None):
     label.setStyleSheet(f"background: {PANEL}; border-bottom: 3px solid {DEEP}; padding: 4px;")
     _banners.add(label)
     return label
+
+
+class FlowLayout(QLayout):
+    """A row of buttons that wraps onto the next line when the window gets narrow, so nothing is cut off.
+    A stretch (add_stretch) pushes the following items to the right end of their line."""
+
+    def __init__(self, parent=None, spacing=6):
+        super().__init__(parent)
+        self._items, self._stretch_at = [], set()
+        self.setSpacing(spacing)
+        self.setContentsMargins(0, 0, 0, 0)
+
+    def addItem(self, item):
+        self._items.append(item)
+
+    def add_stretch(self):
+        self._stretch_at.add(len(self._items))
+
+    def count(self):
+        return len(self._items)
+
+    def itemAt(self, i):
+        return self._items[i] if 0 <= i < len(self._items) else None
+
+    def takeAt(self, i):
+        return self._items.pop(i) if 0 <= i < len(self._items) else None
+
+    def expandingDirections(self):
+        return Qt.Orientations(0)
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, width):
+        return self._place(QRect(0, 0, width, 0), apply=False)
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        self._place(rect, apply=True)
+
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSize(self):
+        size = QSize()
+        for item in self._items:
+            size = size.expandedTo(item.minimumSize())
+        m = self.contentsMargins()
+        return size + QSize(m.left() + m.right(), m.top() + m.bottom())
+
+    def _place(self, rect, apply):
+        m = self.contentsMargins()
+        r = rect.adjusted(m.left(), m.top(), -m.right(), -m.bottom())
+        gap = self.spacing()
+        lines, line, x = [], [], 0
+        for i, item in enumerate(self._items):
+            if item.widget() is not None and item.widget().isHidden():
+                continue
+            w = item.sizeHint().width()
+            if line and x + w > r.width():
+                lines.append(line)
+                line, x = [], 0
+            line.append((i, item))
+            x += w + gap
+        if line:
+            lines.append(line)
+        y = r.y()
+        for line in lines:
+            h = max(item.sizeHint().height() for _i, item in line)
+            if apply:
+                split = next((n for n, (i, _it) in enumerate(line) if i in self._stretch_at and n > 0), None)
+                widths = [item.sizeHint().width() for _i, item in line]
+                xs, x = [], r.x()
+                for n, w in enumerate(widths):
+                    if n == split:
+                        x = max(x, r.right() + 1 - (sum(widths[n:]) + gap * (len(widths) - n - 1)))
+                    xs.append(x)
+                    x += w + gap
+                for (i, item), x, w in zip(line, xs, widths):
+                    item.setGeometry(QRect(QPoint(x, y + (h - item.sizeHint().height()) // 2),
+                                           QSize(w, item.sizeHint().height())))
+            y += h + gap
+        return y - gap - rect.y() + m.bottom() if lines else 0

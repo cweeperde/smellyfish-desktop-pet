@@ -5,3 +5,9 @@ numpy==2.2.6
 soundcard==0.4.6
 pyinstaller==6.22.2
 cryptography==46.0.3
+python-dateutil==2.9.0.post0
+winrt-runtime==4.1.0
+winrt-Windows.Foundation==4!10.0.28000.2957
+winrt-Windows.Foundation.Collections==4!10.0.28000.2957
+winrt-Windows.Media.Control==4!10.0.28000.2957
+winrt-Windows.Storage.Streams==4!10.0.28000.2957

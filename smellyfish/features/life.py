@@ -1,6 +1,14 @@
 """Statistics and achievements (persisted in the settings)."""
 import time
 
+DAY_START_H = 4
+
+
+def click_day(now=None):
+    """The click counter's day runs from 4:00 to 4:00, so a late night does not reset it at midnight."""
+    t = time.time() if now is None else now
+    return time.strftime("%Y-%m-%d", time.localtime(t - DAY_START_H * 3600))
+
 ACHIEVEMENTS = [
     ("first_task", "First task", "Your AI agent finished a task", "tasks_done", 1),
     ("task_10", "Busy bee", "10 finished AI tasks", "tasks_done", 10),
@@ -57,6 +65,10 @@ class Life:
         self.cfg["stats"] = self.stats
         self.cfg["achievements"] = self.unlocked
         self.cfg.save()
+        for mine, key in ((self.stats, "stats"), (self.unlocked, "achievements")):
+            merged = self.cfg.get(key)
+            if isinstance(merged, dict) and merged is not mine:
+                mine.update(merged)
 
     def unlocked_count(self):
         known = {a[0] for a in ACHIEVEMENTS}

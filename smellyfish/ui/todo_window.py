@@ -3,10 +3,11 @@ import time
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont
-from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QMenu, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QComboBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
+                               QListWidgetItem, QMenu, QMessageBox, QPushButton, QVBoxLayout, QWidget)
 
 from smellyfish.art import sprite
+from smellyfish.features import export
 from smellyfish.features.todos import fmt_due
 from smellyfish.ui import theme
 
@@ -103,9 +104,17 @@ class TodoWindow(QWidget):
         self.clear_btn = QPushButton("Clear finished")
         self.clear_btn.setObjectName("secondary")
         self.clear_btn.clicked.connect(self.app.todo_clear_done)
+        exp = QPushButton("Export...")
+        exp.setObjectName("secondary")
+        exp_menu = QMenu(exp)
+        exp_menu.addAction("As Markdown (.md)...", lambda: self.export("md"))
+        exp_menu.addAction("As CSV for Excel (.csv)...", lambda: self.export("csv"))
+        exp.setMenu(exp_menu)
+        exp.setProperty("menu", "1")
         close = QPushButton("Close")
         close.clicked.connect(self.close)
         row.addWidget(self.clear_btn)
+        row.addWidget(exp)
         row.addStretch(1)
         row.addWidget(close)
         body.addLayout(row)
@@ -198,3 +207,16 @@ class TodoWindow(QWidget):
         if ok:
             self.app.todos.edit(tid, due=due)
             self.app.todos_changed()
+
+    def export(self, kind):
+        name = f"smellyfish-todo-{time.strftime('%Y-%m-%d')}.{kind}"
+        filt = "Markdown (*.md)" if kind == "md" else "CSV (*.csv)"
+        path, _ = QFileDialog.getSaveFileName(self, "Export to-dos and reminders", name, filt)
+        if not path:
+            return
+        todos, reminders = self.app.todos.items, list(self.app.cfg.get("reminders") or [])
+        text = export.todos_markdown(todos, reminders) if kind == "md" else export.todos_csv(todos, reminders)
+        try:
+            export.save(path, text)
+        except OSError as e:
+            QMessageBox.warning(self, "Smellyfish", f"Could not save the file:\n{e}")

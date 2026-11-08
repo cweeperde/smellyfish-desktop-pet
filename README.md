@@ -4,7 +4,7 @@
 
 # Smellyfish
 
-**A tiny pixel-art jellyfish that lives on your Windows desktop<br>and keeps an eye on Claude Code, Codex and your PC.**
+**A pixel-art jellyfish that lives on your Windows desktop<br>and shows what Claude Code, Codex and your PC are doing.**
 
 [![Download](https://img.shields.io/github/v/release/cweeperde/smellyfish-desktop-pet?label=download&style=for-the-badge&color=c492ec&labelColor=221634)](https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.exe)
 ![Windows 10 / 11](https://img.shields.io/badge/windows-10%20%7C%2011-8c60be?style=for-the-badge&labelColor=221634)
@@ -16,64 +16,90 @@
 
 <p align="center"><img src="docs/media/desktop.gif" alt="Smellyfish sitting on a window and asking a question" width="100%"></p>
 
+Smellyfish sits on your windows, hops between them and goes to bed in its own little house. While Claude Code or Codex works, it pulls out a laptop; when they ask something, the question appears in a speech bubble you can answer with a click. It also keeps your calendar, shows what music is playing and reacts to what your PC is doing.
+
 ## What it does
 
 |  |  |
 |---|---|
-| **Lives on your desktop** | Sits on the top edge of your windows, hops between them, climbs window sides and floats back home to its little house with a lamp, a bed and a plant. Grab it and it dangles from a tentacle. |
-| **Codes with you** | Pulls out a laptop while Claude Code or Codex works, grabs a magnifier when it searches, a terminal for commands, a globe for the web, and sometimes puts on a chef hat because your code is *cooking*. |
-| **Answers from a bubble** | Questions and permission requests from Claude Code show up in a pixel speech bubble with buttons. Click to answer, or let it fall back to the terminal. |
-| **Keeps you posted** | Task timer, a summary when a task is done, warnings when your usage limits run low, and a quiet badge for everything you missed in do-not-disturb. Timers and counters only show up when something changes or when you point at it. |
-| **Knows your PC** | Sweats when the CPU is busy, dances to your music, wears a headset in Discord calls, gets a cartoon zap from the charger, reminds you of a full recycle bin and hides while you play fullscreen games. |
-| **Just cute** | Pet its head, tickle its tentacles, throw it a ball, feed it a fish, check the weather at its plant, collect achievements. It also dangles upside down under windows now and then. |
-| **Talks (optional)** | Chat with your own local Ollama or llama.cpp model. Short, cute answers in a speech bubble; the model loads when needed and unloads when idle. |
-| **Visits (optional)** | Create a LAN lobby: friends step out of a door wearing their own look and hand over letters. Encrypted and limited to your network. |
+| **On your desktop** | Sits on the top edge of windows, jumps between them, climbs their sides and hangs from a tentacle under them now and then. Its tentacles trail behind when it hops. Grab it and it dangles from your cursor. |
+| **With your coding agent** | A laptop while Claude Code or Codex works, a magnifier when it searches, a terminal for commands, a globe for the web. Now and then it puts the laptop away for a short break, and a task timer shows how long the agent has been at it. |
+| **In speech bubbles** | Questions and permission requests from Claude Code come with buttons. Click to answer, or close the bubble and answer in the terminal as usual. |
+| **Calendar** | Month, week and day views, your own events, `.ics` import and subscribed links from Google, Outlook, iCloud or a university timetable. It reminds you before appointments. |
+| **Music** | Spotify, a browser or any other player that reports to Windows: headphones on, a note in the badge, and play, pause and skip in a bubble. |
+| **Your PC** | Sweats when the CPU is busy, wears a headset in Discord calls, gets a cartoon zap from the charger, points out a full recycle bin and hides during fullscreen games. |
+| **Play** | Pet its head, tickle its tentacles, throw it a ball, feed it a fish, water its plant, collect achievements. |
+| **Optional** | A chat with your own local Ollama or llama.cpp model, and a LAN lobby where friends visit and hand over letters. |
 
 <p align="center"><img src="docs/media/animations.gif" alt="Some of the animations" width="100%"></p>
 
-## Friends and chat
+## Calendar
+
+<p align="center"><img src="docs/media/calendar.png" alt="The calendar window in month view with a subscribed university timetable" width="100%"></p>
+
+Your own calendar is always there. Imported `.ics` files become calendars you can edit; subscribed links are refreshed every hour and stay read-only. Removing a calendar removes only its own events. To-dos with a due time and reminders show up in the calendar too, and everything can be exported again as `.ics`, the to-do list also as Markdown or CSV.
+
+## Music and movement
+
+<p align="center"><img src="docs/media/music.gif" alt="The jellyfish with headphones next to a bubble with play, pause and skip" width="100%"></p>
+
+When music plays, it switches between dancing, bopping along and just carrying on with headphones. Click the note in the badge for the controls.
+
+<p align="center"><img src="docs/media/tentacles.gif" alt="The jellyfish hopping, its tentacles trailing behind" width="100%"></p>
+
+It contracts before a hop, its tentacles trail behind in the air and settle back into shape after the landing. Idle actions come at irregular times, it is livelier in the late morning than late at night, and it startles when you switch windows very fast.
+
+## First start
+
+<p align="center"><img src="docs/media/tour.png" alt="Three tour bubbles: hello, a setup question with back and next, and the final check" width="100%"></p>
+
+The jellyfish explains the basics and asks a few questions: Claude Code hooks, which screen, whether it may roam, a home, weather, sounds and autostart. You can go back and forth, and nothing changes until you confirm on the last page. Right-click > More > Show the tour plays it again.
+
+## More helpers
+
+<p align="center"><img src="docs/media/features.gif" alt="Discord status, weather, focus timer, usage limits, recycle bin, achievements, task timer, reminders, calendar, local chat and lobby visits" width="100%"></p>
 
 <p align="center"><img src="docs/media/visit.gif" alt="A friend's jellyfish steps out of a door and hands over a letter" width="100%"></p>
 
-Create a lobby on your network and friends can join with a password. Their jellyfish steps out of a door in its own colors and outfit and can hand over a letter. There is also an optional chat with your own local Ollama or llama.cpp model. Everything comes in a dark and a light look.
-
-## Little helpers
-
-<p align="center"><img src="docs/media/features.gif" alt="Discord status, weather, focus timer, usage limits, recycle bin, achievements, task timer and reminders" width="100%"></p>
-
-<p align="center"><img src="docs/media/bubbles.png" alt="Speech bubbles" width="100%"></p>
-
 ## Download
 
-1. Grab **[`Smellyfish.exe`](https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.exe)** (always the latest version; older ones are in the [releases](https://github.com/cweeperde/smellyfish-desktop-pet/releases)).
-2. Run it. That's it: one portable file, nothing to install.
-3. Right-click the jellyfish in the tray for settings. Claude Code and Codex integration can be switched on there.
+1. Download [`Smellyfish.exe`](https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.exe). The link always points to the latest version; older ones are in the [releases](https://github.com/cweeperde/smellyfish-desktop-pet/releases).
+2. Run it. It is a single portable file, there is nothing to install.
+3. Follow the short tour. Later, right-click the jellyfish or its tray icon for the menu and the settings.
 
-New versions install themselves automatically (you can turn that off in the settings).
+New versions install themselves; you can turn that off in the settings.
 
 ## Privacy & safety
 
-Smellyfish is meant to be easy to trust, which is why the source is public.
+The source is public so you can check what the program does.
 
-- **Your sessions stay local.** It listens only on `127.0.0.1` for events from Claude Code and Codex, and none of that ever leaves your PC.
-- **Nothing changes without asking.** Claude Code / Codex hooks and the optional status line are only written when you switch them on in the settings, and a backup of your config is made first. Switching them off removes exactly what was added.
-- **Every failure is harmless.** If the app is closed or something goes wrong, Claude Code and Codex behave as if Smellyfish wasn't there.
-- **The lobby is opt-in and local.** Nothing listens until you create or join a lobby. Traffic is password-protected and encrypted (X25519 + ChaCha20-Poly1305), rate-limited, and never leaves your network. The local chat only talks to your own PC or a private address.
-- **Network use is minimal and optional.** Weather comes from [Open-Meteo](https://open-meteo.com) only when you enter a place. Updates are fetched from this repository's releases and checked against GitHub's SHA-256 digest. Discord features only talk to the Discord app on your own PC. The optional "Playing Smellyfish" status is switched on by default, can be turned off in the settings, and only shares short generic lines.
-- **The About window talks to GitHub.** Only when you open it, Smellyfish asks `api.github.com` for the contributor list and downloads the profile pictures from `avatars.githubusercontent.com`. GitHub sees your IP address like on any website. Nothing else is sent and nothing is saved to disk.
-- **Your data stays yours.** Settings live in `%APPDATA%\Smellyfish`.
+- Events from Claude Code and Codex arrive on `127.0.0.1` only and never leave your PC.
+- Hooks and the optional status line are written only after you agree, in the tour or in the settings. A backup of your config is made first, and switching them off removes exactly what was added.
+- If Smellyfish is closed or something goes wrong, Claude Code and Codex behave as if it were not installed.
+- The lobby is off until you create or join one. Its traffic is password-protected, encrypted (X25519 + ChaCha20-Poly1305), rate-limited and stays on your network. The local chat only talks to your own PC or a private address.
+- Weather comes from [Open-Meteo](https://open-meteo.com) and only when you enter a place. Updates come from this repository's releases and are checked against GitHub's SHA-256 digest.
+- A subscribed calendar is downloaded about once an hour from the link you entered; nothing is sent to it. Imported and local calendars stay in `%APPDATA%\Smellyfish\calendars`.
+- Song titles and controls come from the Windows media controls. Smellyfish does not contact Spotify or any other service.
+- Discord features talk only to the Discord app on your PC. The "Playing Smellyfish" status is on by default, shares only short generic lines and can be switched off.
+- The About window asks `api.github.com` for the contributor list and loads their pictures from `avatars.githubusercontent.com`, only while it is open. Nothing is saved.
+- Settings are stored in `%APPDATA%\Smellyfish`.
 
 ## Project layout
 
 ```
 smellyfish/
-  app.py              the pet: windows, animation player, physics, events
-  art/                sprites and animations (pixel art as text), bubbles, house, sounds
-  features/           focus timer, to-do list, achievements, toys
-  integrations/       hook server and relay, Claude Code / Codex hooks, usage limits, Discord, weather
-  system/             window edges, PC monitor, recycle bin, hotkeys, beat detection
-  ui/                 settings and other windows
+  app.py              the pet: windows, animation player, physics, bubbles, menu, events
+  settings.py         settings file with merge-save and backups
+  changelog.py        release notes shown in the app
   updater.py          self-update from GitHub releases
+  art/                sprites and animations as text rasters, simulated tentacles, bubbles, house, sounds
+  features/           calendar, to-dos and exports, first-start tour, mood and timing, focus timer,
+                      achievements, toys, lobby visitors
+  integrations/       hook server and relay, Claude Code / Codex hooks, usage limits, Discord,
+                      media controls, weather, local chat, LAN lobby
+  system/             window edges, foreground window, PC monitor, recycle bin, hotkeys, beat detection,
+                      click counter
+  ui/                 settings, calendar, to-do, animation tester, lobby, chat, about and other windows
 tools/build_exe.py    how the release exe is built
 ```
 

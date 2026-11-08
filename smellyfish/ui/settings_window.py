@@ -57,11 +57,12 @@ SCHEMA = [
         ("sit_on_windows", "Sit on windows", None),
         ("sit_on_icons", "Sit on desktop icons and files", None),
         ("window_hop", "Jump between windows", None),
-        ("ceiling_hang", "Hang upside down under windows", None),
+        ("ceiling_hang", "Hang from a tentacle under windows", None),
         ("wander", "Hop around by itself", None),
         ("trips_home", "Go home now and then", None),
         ("auto_water", "Water the plant now and then", None),
         ("eyes_follow", "Eyes follow the cursor", None),
+        ("tentacle_sim", "Tentacles trail behind when it moves", None),
         ("monitor", "Stay on", monitor_choices),
     ]),
     ("Claude Code & Codex", [
@@ -76,7 +77,7 @@ SCHEMA = [
         ("claude_statusline", "Claude usage via status line", None),
     ]),
     ("Reactions", [
-        ("fidgets", "Little idle actions", None),
+        ("fidgets", "Idle actions", None),
         ("react_cpu", "Sweat when the CPU is busy", None),
         ("react_battery", "Battery warnings", None),
         ("react_network", "Notice when offline", None),
@@ -92,6 +93,7 @@ SCHEMA = [
     ]),
     ("Music, games & Discord", [
         ("react_music", "Dance to music", None),
+        ("media", "Show what is playing (Spotify, browser, other players)", None),
         ("beat_sync", "Dance on the beat", None),
         ("game_mode", "Hide in fullscreen apps and games", None),
         ("discord", "Headset when in a Discord call", None),
@@ -148,8 +150,8 @@ class SettingsWindow(QWidget):
         outer.addWidget(theme.banner("Settings", f"Smellyfish {__version__}"))
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        inner = QWidget()
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        inner = self.scroll_inner = QWidget()
         root = QVBoxLayout(inner)
         scroll.setWidget(inner)
         outer.addWidget(scroll)
@@ -374,9 +376,11 @@ class SettingsWindow(QWidget):
         self.llm_panel.hide()
         app.llm.models_ready.connect(self.on_models)
 
-        tools = QHBoxLayout()
+        tools = theme.FlowLayout()
         for text, fn in (("Lobby (LAN)...", app.open_lobby), ("Animation tester...", app.open_gallery), ("Missed...", app.open_history),
                          ("Achievements...", app.open_achievements), ("Discord setup...", app.open_discord_setup),
+                         ("Show detected edges", app.show_edges),
+                         ("Show the tour", lambda: (self.close(), app.start_tour(True))),
                          ("Check for updates", lambda: app.updater.check(manual=True))):
             b = QPushButton(text)
             b.setObjectName("secondary")
@@ -384,7 +388,7 @@ class SettingsWindow(QWidget):
             tools.addWidget(b)
         root.addLayout(tools)
 
-        buttons = QHBoxLayout()
+        buttons = theme.FlowLayout()
         buttons.setContentsMargins(12, 0, 12, 0)
         for text, fn in (("Set home here", app.set_home_here), ("Go home", app.go_home)):
             b = QPushButton(text)
@@ -393,7 +397,8 @@ class SettingsWindow(QWidget):
             buttons.addWidget(b)
         self.save_status = QLabel("")
         self.save_status.setObjectName("hint")
-        buttons.addWidget(self.save_status, 1, Qt.AlignRight)
+        buttons.add_stretch()
+        buttons.addWidget(self.save_status)
         cancel = QPushButton("Cancel")
         cancel.setObjectName("secondary")
         cancel.clicked.connect(self.cancel)
@@ -402,6 +407,7 @@ class SettingsWindow(QWidget):
         self.save_button.clicked.connect(self.save)
         buttons.addWidget(self.save_button)
         outer.addLayout(buttons)
+        self.setMinimumWidth(min(900, inner.minimumSizeHint().width() + 40))
         self.refresh()
 
     def refresh(self):

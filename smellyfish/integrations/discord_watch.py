@@ -50,6 +50,87 @@ def discord_mic_in_use():
                 pass
 
 
+DISCORD_EXES = {"discord.exe", "discordptb.exe", "discordcanary.exe"}
+
+
+def _discord_windows():
+    """Top-level windows owned by a Discord process: [(hwnd, visible_on_screen)]."""
+    if sys.platform != "win32":
+        return []
+    import ctypes
+    from ctypes import wintypes
+    user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
+    try:
+        dwm = ctypes.windll.dwmapi
+    except OSError:
+        dwm = None
+    names, found = {}, []
+
+    def exe_of(pid):
+        if pid not in names:
+            name = ""
+            h = kernel32.OpenProcess(0x1000, False, pid)
+            if h:
+                buf = ctypes.create_unicode_buffer(520)
+                size = wintypes.DWORD(len(buf))
+                if kernel32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(size)):
+                    name = os.path.basename(buf.value).lower()
+                kernel32.CloseHandle(h)
+            names[pid] = name
+        return names[pid]
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def each(hwnd, _):
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if exe_of(pid.value) not in DISCORD_EXES or user32.GetWindow(hwnd, 4) or not user32.GetWindowTextLengthW(hwnd):
+            return True
+        rect = wintypes.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        cloaked = wintypes.DWORD(0)
+        if dwm is not None:
+            dwm.DwmGetWindowAttribute(hwnd, 14, ctypes.byref(cloaked), ctypes.sizeof(cloaked))
+        shown = (bool(user32.IsWindowVisible(hwnd)) and not user32.IsIconic(hwnd) and not cloaked.value
+                 and rect.right - rect.left > 50 and rect.bottom - rect.top > 50)
+        found.append((hwnd, shown))
+        return True
+
+    user32.EnumWindows(each, 0)
+    return found
+
+
+def discord_on_screen():
+    """True while a Discord window is open (not minimized, not only in the tray)."""
+    try:
+        return any(shown for _h, shown in _discord_windows())
+    except Exception:
+        return False
+
+
+def message_link(info):
+    """discord:// deep link to a message, or None when the ids are missing."""
+    channel, message = info.get("channel_id"), info.get("message_id")
+    guild = info.get("guild_id") or ("@me" if info.get("dm") else None)
+    if not channel or not guild:
+        return None
+    return f"discord://-/channels/{guild}/{channel}" + (f"/{message}" if message else "")
+
+
+def bring_forward():
+    """Restore the Discord window (also from the tray). Returns False when none was found."""
+    if sys.platform != "win32":
+        return False
+    import ctypes
+    wins = _discord_windows()
+    if not wins:
+        return False
+    hwnd = next((h for h, shown in wins if shown), wins[0][0])
+    user32 = ctypes.windll.user32
+    user32.ShowWindow(hwnd, 9 if user32.IsIconic(hwnd) else 5)
+    user32.SetForegroundWindow(hwnd)
+    return True
+
+
 class Pipe:
     def __init__(self):
         self.f = None
@@ -78,6 +159,7 @@ class Pipe:
         if evt:
             msg["evt"] = evt
         self.send(1, msg)
+        return msg["nonce"]
 
     def close(self):
         try:
@@ -88,7 +170,7 @@ class Pipe:
 
 class DiscordWatch(QObject):
     changed = Signal(object)        # {"in_call", "mute", "deaf", "rpc"}
-    message = Signal(str, str)      # title, body
+    message = Signal(str, str, object)  # title, body, {"channel_id", "message_id", "guild_id", "dm"}
     rpc_status = Signal(str)
 
     def __init__(self, cfg):
@@ -101,6 +183,7 @@ class DiscordWatch(QObject):
         self._stop = False
         self._fails = 0
         self._next_try = 0.0
+        self._guilds = {}
         self.timer = QTimer(self, timeout=self.poll)
         self.timer.start(3000)
 
@@ -200,10 +283,19 @@ class DiscordWatch(QObject):
             pipe.cmd("SUBSCRIBE", evt="VOICE_CHANNEL_SELECT")
             pipe.cmd("SUBSCRIBE", evt="NOTIFICATION_CREATE")
             self.state["rpc"] = True
+            waiting = {}
             while self.cfg.get("discord") and not self._stop:
                 op, msg = pipe.recv()
                 data = msg.get("data") or {}
                 cmd, evt = msg.get("cmd"), msg.get("evt")
+                if cmd == "GET_CHANNEL" and msg.get("nonce") in waiting:
+                    title, body, info = waiting.pop(msg["nonce"])
+                    if evt != "ERROR":
+                        info["guild_id"] = data.get("guild_id")
+                        info["dm"] = data.get("type") in (1, 3)
+                        self._guilds[info["channel_id"]] = (info["guild_id"], info["dm"])
+                    self.message.emit(title, body, info)
+                    continue
                 if cmd == "GET_VOICE_SETTINGS" or evt == "VOICE_SETTINGS_UPDATE":
                     self._set(mute=bool(data.get("mute")), deaf=bool(data.get("deaf")))
                 elif cmd == "GET_SELECTED_VOICE_CHANNEL":
@@ -211,7 +303,16 @@ class DiscordWatch(QObject):
                 elif evt == "VOICE_CHANNEL_SELECT":
                     self._rpc_call = bool(data.get("channel_id"))
                 elif evt == "NOTIFICATION_CREATE" and self.cfg.get("discord_messages"):
-                    self.message.emit(str(data.get("title") or "Discord"), str(data.get("body") or ""))
+                    title, body = str(data.get("title") or "Discord"), str(data.get("body") or "")
+                    info = {"channel_id": str(data.get("channel_id") or ""),
+                            "message_id": str((data.get("message") or {}).get("id") or "")}
+                    known = self._guilds.get(info["channel_id"])
+                    if known or not info["channel_id"]:
+                        if known:
+                            info["guild_id"], info["dm"] = known
+                        self.message.emit(title, body, info)
+                    else:
+                        waiting[pipe.cmd("GET_CHANNEL", {"channel_id": info["channel_id"]})] = (title, body, info)
         except Exception as e:
             self._failed(f"Discord: {e}")
         finally:

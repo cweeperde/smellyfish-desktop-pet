@@ -176,8 +176,8 @@ class AboutWindow(QWidget):
         body.setSpacing(8)
         root.addLayout(body, 1)
 
-        blurb = QLabel("A tiny pixel-art jellyfish that lives on your desktop and keeps an eye on your PC and "
-                       "your coding agents.")
+        blurb = QLabel("A pixel-art jellyfish that lives on your desktop and shows what your PC and "
+                       "your coding agents are doing.")
         blurb.setWordWrap(True)
         body.addWidget(blurb)
 

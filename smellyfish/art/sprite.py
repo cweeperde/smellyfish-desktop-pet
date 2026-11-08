@@ -183,6 +183,7 @@ class Pose:
         self.typing = False
         self.down = ()
         self.tp = ("hang",) * 4
+        self.tent_px = None
         self.laptop = None
         self.blush = False
         self.squash = False
@@ -193,7 +194,6 @@ class Pose:
         self.mouth = None
         self.band = False
         self.flip = False
-        self.flipv = False
         self.parts = []
         self.wear = []
         self.__dict__.update(kw)
@@ -246,6 +246,17 @@ def eye_px(p, anchors):
     return []
 
 
+def tent_offsets(p):
+    """The four front-view tentacles of a pose as pixel offsets from their roots (for easing the simulation)."""
+    out = []
+    for k, x in enumerate(F_TENT):
+        if p.curvy and p.tent == "straight":
+            out.append(list(F_TP.get(p.tp[k], F_TP["hang"])))
+        else:
+            out.append([(a - x, b - 9) for a, b in strand(x, p.tent)])
+    return out
+
+
 def layers(p):
     """All pixels of a pose as (x, y, colour key), in draw order."""
     out = []
@@ -281,7 +292,9 @@ def layers(p):
         if p.squash:
             body, root, oy = FRONT[:6] + FRONT[7:], 8, oy + 1
         for k, x in enumerate(F_TENT):
-            if p.curvy and p.tent == "straight":
+            if p.tent_px:
+                pts = [(x + a, root + b) for a, b in p.tent_px[k]]
+            elif p.curvy and p.tent == "straight":
                 pts = [(x + a, root + b) for a, b in F_TP.get(p.tp[k], F_TP["hang"])]
             else:
                 pts = strand(x, p.tent, root=root)
@@ -311,8 +324,6 @@ def layers(p):
     if p.tint:
         t = TINTS[p.tint]
         out = [(x, y, t.get(c, c)) if i < n_body else (x, y, c) for i, (x, y, c) in enumerate(out)]
-    if p.flipv:
-        out = [(x, 2 * BY + 12 - y, c) for x, y, c in out if 0 <= 2 * BY + 12 - y < CH]
     if p.lift:
         out = [(x, y + p.lift, c) for x, y, c in out]
     if p.flip:
@@ -709,15 +720,6 @@ def zap():
     intro.append((Pose(eyes="happy", dy=-2, tent="long", arm_f=("up_l", "up_r")), 120))
     intro.append((Pose(eyes="happy"), 200))
     return {"intro": intro, "loop": []}
-
-
-def ceiling():
-    base = Pose(flipv=True, curvy=True)
-    sway = [(0, "straight"), (1, "right"), (1, "right"), (0, "straight"), (-1, "left"), (-1, "left")]
-    loop = []
-    for k, (dx, tent) in enumerate(sway):
-        loop.append((base.but(dx=dx, tent=tent, eyes="blink" if k == 3 else "open", ey=1), 520))
-    return {"intro": [(base.but(ey=1, tent="spread"), 160), (base.but(ey=1), 160)], "loop": loop}
 
 
 def offline():
@@ -1167,6 +1169,13 @@ def trophy():
     return {"intro": intro, "loop": []}
 
 
+def tug():
+    """Mini mode, being pulled out of the screen edge: it holds on and strains against it."""
+    p = Pose(side=True, flip=True, eyes="angry", tent="spread")
+    return {"loop": [(p, 140), (p.but(dx=-1, eyes="wide"), 120), (p.but(eyes="angry", dy=-1), 140),
+                     (p.but(dx=-1, eyes="wide"), 120)]}
+
+
 def peek():
     p = Pose(side=True, flip=True, ex=1)
     loop = [(p, 1800), (p.but(eyes="blink"), 120), (p, 1400), (p.but(ey=-1), 700), (p.but(dx=-1), 900), (p, 600)]
@@ -1261,7 +1270,7 @@ def with_weather(p, kind, inv=False):
     only the sleeping cap replaces them."""
     if not kind or p.cap:
         return p
-    table = WEATHER_SIDE if p.side else WEATHER_INV if (inv or p.flipv) else WEATHER
+    table = WEATHER_SIDE if p.side else WEATHER_INV if inv else WEATHER
     if kind not in table:
         return p
     if kind == "sun" and (p.eyes not in ("open", "blink") or p.headset == "mic"):
@@ -1547,10 +1556,10 @@ def juggle():
     return {"intro": intro, "loop": []}
 
 
-CUP = ["......", "WWWW..", "WttWWW", "WttW.W", "WttWW.", ".WW..."]
+CUP = ["......", "WqqW..", "WWWWWW", "WhhW.W", "WWWWW.", ".WW..."]
 
 
-def tea():
+def coffee():
     steam = lambda t, x, y: [(STEAM[t % 2], x + 1, y - 3)]
     held = Pose(arm_f=("rest_l", "up_r"))
     intro = [(held.but(parts=[(CUP, BX + 15, BY + 3)] + steam(0, BX + 15, BY + 3)), 400),
@@ -1680,6 +1689,166 @@ def hang_image(phase, pal=None, dressed=None):
     return img, (1 + GRAB_X, 0)
 
 
+CAL_PAGE = ["RRRRRRR", "RWRRRWR", "WWWWWWW", "WOWOWOW", "WWWWWWW", "WOWOWWW", "WWWWWWW"]
+CAL_TORN = ["WWWWWWW", "WOWOWOW", "WWWWWWW", "WOWOWWW", "WWWWWWW"]
+LAP_BACK = ["GGGGGGGGGGGG", "GhhhhhhhhhhG", "GhhhhhWhhhhG", "GhhhhhhhhhhG", "GhhhhhhhhhhG", "kkkkkkkkkkkk"]
+
+
+# ---------------------------------------------------------------- idle: floating / breathing
+def float_idle():
+    """Hovers on the spot: the bell pulses, the tentacles trail behind the slow up and down."""
+    loop = []
+    ys = [0, 0, -1, -1, -2, -2, -2, -1, -1, 0]
+    for t, dy in enumerate(ys):
+        squash = t == 0
+        p = Pose(dy=dy, curvy=not squash, tp=wave(t // 2), tent="spread" if squash else "straight", squash=squash,
+                 eyes="blink" if t == 6 else "open")
+        loop.append((p, 140 if squash else 230))
+    return {"loop": loop}
+
+
+def breathe():
+    """Calm breathing for long idle stretches: contract, hold, relax."""
+    b = Pose()
+    loop = [(b, 900), (b.but(squash=True, tent="spread"), 260), (b.but(dy=-1, tent="long"), 340),
+            (b.but(dy=-1), 500), (b.but(eyes="blink", dy=-1), 110), (b.but(dy=-1), 300), (b, 700)]
+    return {"loop": loop}
+
+
+# ---------------------------------------------------------------- movement: a jellyfish hop
+def hop_prep():
+    """Contracts before pushing off."""
+    f = Pose()
+    return {"loop": [(f.but(squash=True, tent="spread", eyes="blink"), 110), (f.but(squash=True, tent="tuck"), 80)]}
+
+
+def rise():
+    """On the way up: pulses with long tentacles."""
+    f = Pose(eyes="wide")
+    return {"loop": [(f.but(tent="long"), 110), (f.but(tent="tuck"), 100)]}
+
+
+def sink():
+    """On the way down: tentacles spread like a parachute."""
+    return {"loop": [(Pose(tent="spread", arm_f=("up_l", "up_r")), 160), (Pose(tent="spread"), 160)]}
+
+
+# ---------------------------------------------------------------- reactions
+def startle():
+    up = ("up_l", "up_r")
+    bang = [(BANG, BX + 18, BY - 7)]
+    intro = [(Pose(), 120), (Pose(eyes="wide", dy=-3, tent="spread", arm_f=up, parts=bang), 90),
+             (Pose(eyes="wide", dy=-5, tent="spread", arm_f=up, parts=bang), 140),
+             (Pose(eyes="wide", dy=-3, tent="long", arm_f=up, parts=bang), 90),
+             (Pose(eyes="wide", squash=True, tent="spread"), 110),
+             (Pose(eyes="wide", ex=-1), 350), (Pose(eyes="wide", ex=1), 350), (Pose(eyes="blink"), 100),
+             (Pose(), 250)]
+    return {"intro": intro, "loop": []}
+
+
+def tickled_b():
+    """Rolls from side to side laughing."""
+    intro = []
+    for t in range(10):
+        side = 1 if t % 2 else -1
+        intro.append((Pose(eyes="happy", blush=True, dx=side, tent="right" if side > 0 else "left",
+                           arm_f=("up_l", "up_r"),
+                           parts=[(GIGGLE, BX + (19 if side < 0 else -4), BY - 3 + t % 3)]), 120))
+    intro += [(Pose(eyes="happy", blush=True, squash=True, tent="spread"), 160), (Pose(eyes="happy", blush=True), 300)]
+    return {"intro": intro, "loop": []}
+
+
+def petted_b():
+    """Leans into the hand and melts a little."""
+    intro = [(Pose(eyes="happy", blush=True), 220), (Pose(eyes="sleep", blush=True, dx=-1), 300)]
+    for t in range(4):
+        intro.append((Pose(eyes="sleep", blush=True, dx=-1, squash=t % 2 == 0, tent="spread" if t % 2 == 0 else "straight",
+                           parts=[(HEART, BX + 16, BY - 3 - t)]), 360))
+    intro += [(Pose(eyes="sleep", blush=True, dx=0, squash=True, tent="spread"), 400),
+              (Pose(eyes="happy", blush=True), 300)]
+    return {"intro": intro, "loop": []}
+
+
+def done_b():
+    """Variant of 'done': a happy spin jump with stars."""
+    up = ("up_l", "up_r")
+    stars = lambda k: [(STAR, BX - 3 + k, BY - 3 - k), (STAR, BX + 17 - k, BY - 1 - k)]
+    intro = [(Pose(eyes="happy", squash=True, tent="spread"), 110), (Pose(eyes="happy", dy=-3, tent="long", arm_f=up), 80),
+             (Pose(eyes="happy", dy=-5, side=True, tent="long"), 90),
+             (Pose(eyes="happy", dy=-6, side=True, flip=True, tent="long"), 90),
+             (Pose(eyes="happy", dy=-5, arm_f=up, parts=stars(0)), 120),
+             (Pose(eyes="happy", dy=-2, tent="spread", arm_f=up, parts=stars(1)), 120),
+             (Pose(eyes="happy", squash=True, tent="spread", parts=stars(2)), 110)]
+    loop = []
+    for t in range(8):
+        loop.append((Pose(eyes="happy", curvy=True, tp=wave(t // 2), arm_f=up if t % 4 < 2 else ("rest_l", "rest_r"),
+                          parts=[(SPARKLE, BX + 16 + t % 2, BY - 4)] if t % 4 == 0 else []), 200))
+    loop.append((Pose(eyes="happy", curvy=True, tp=wave(0)), 500))
+    return {"intro": intro, "loop": loop, "outro": [(Pose(eyes="happy"), 200), (Pose(), 160)]}
+
+
+def music_bop():
+    """Bops along to the music with headphones on, eyes closed. The 'do not just dance all the time' option."""
+    loop = []
+    for t in range(12):
+        nod = t % 2
+        notes = [(NOTE if (t // 3) % 2 else NOTE2, BX + 17 + (t % 3), BY - 2 - (t % 4))] if t % 3 == 0 else []
+        loop.append((Pose(headset="phones", eyes="sleep" if t % 6 < 4 else "happy", ey=nod,
+                          tent=("left", "straight", "right", "straight")[(t // 2) % 4], parts=notes), 300))
+    return {"intro": [(Pose(headset="phones"), 200)], "loop": loop, "outro": [(Pose(headset="phones"), 150)]}
+
+
+# ---------------------------------------------------------------- new actions
+def calendar_page():
+    """An appointment starts: it pulls out a calendar page, reads it, gets it, tears the page off."""
+    hold = ("rest_l", "up_r")
+    intro = []
+    path = [(BX + 19, BY + 9), (BX + 18, BY + 5), (BX + 17, BY + 2), (BX + 16, BY + 1)]
+    for i, (x, y) in enumerate(path):
+        intro.append((Pose(ex=1, ey=1 if i else 0, arm_f=hold, parts=[(CAL_PAGE, x, y)]), 90))
+    page = [(CAL_PAGE, BX + 16, BY + 1)]
+    intro += [(Pose(ex=1, ey=1, arm_f=hold, parts=page), 380), (Pose(ex=1, ey=1, eyes="blink", arm_f=hold, parts=page), 100),
+              (Pose(ex=1, ey=1, arm_f=hold, parts=page), 300),
+              (Pose(eyes="wide", ex=1, arm_f=hold, parts=page + [(BANG, BX + 9, BY - 7)]), 400),
+              (Pose(eyes="happy", arm_f=("up_l", "up_r"), parts=[(CAL_TORN, BX + 16, BY + 3), (CAL_PAGE[:2], BX + 17, BY - 1)]), 160),
+              (Pose(eyes="happy", arm_f=("up_l", "rest_r"), parts=[(CAL_TORN, BX + 16, BY + 3), (CAL_PAGE[:2], BX + 19, BY - 4)]), 160),
+              (Pose(eyes="happy", parts=[(CAL_TORN, BX + 16, BY + 3), (CAL_PAGE[:2], BX + 22, BY - 7)]), 160),
+              (Pose(eyes="happy", dy=-1, tent="long", parts=[(CAL_TORN, BX + 16, BY + 3)]), 140),
+              (Pose(eyes="happy", parts=[(CAL_TORN, BX + 16, BY + 4)]), 300),
+              (Pose(ex=1, parts=[(CAL_TORN, BX + 18, BY + 8)]), 120), (Pose(), 200)]
+    return {"intro": intro, "loop": []}
+
+
+def working_b():
+    """Second laptop pose for 'working': front view, laptop on its lap, screen glow on the face."""
+    lap = lambda dy=0: [(LAP_BACK, BX + 2, BY + 8 + dy)]
+    intro = [(Pose(), 150), (Pose(ey=1, parts=[(LAP_BACK, BX + 2, BY + 11)]), 110), (Pose(ey=1, parts=lap(1)), 110),
+             (Pose(ey=1, parts=lap()), 200)]
+    loop = []
+    for t in range(16):
+        typing = t % 8 < 6
+        loop.append((Pose(ey=1, ex=(0, 0, 0, 0, 0, 0, -1, 1)[t % 8], tent="tuck" if typing and t % 2 else "spread",
+                          dy=-(t % 2) if typing else 0, eyes="blink" if t == 11 else "open",
+                          parts=lap(-(t % 2) if typing else 0)), 110 if typing else 260))
+    outro = [(Pose(ey=1, eyes="happy", parts=lap()), 200), (Pose(eyes="happy", parts=[(LAP_BACK, BX + 2, BY + 11)]), 100),
+             (Pose(), 160)]
+    return {"intro": intro, "loop": loop, "outro": outro}
+
+
+def search_b():
+    """Second pose for 'search': reads a book and checks it with the magnifier."""
+    hold = ("rest_l", "up_r")
+    loop = []
+    xs = [0, 1, 2, 3, 2, 1]
+    for t in range(12):
+        x = xs[t % 6]
+        book = BOOK_FLIP if t == 8 else BOOK
+        loop.append((Pose(ex=1, ey=1, arm_f=hold, eyes="blink" if t == 5 else "open",
+                          parts=[(book, BX + 14, BY + 4), (GLASS, BX + 13 + x, BY + 2 - (t % 2))]), 200))
+    return {"intro": [(Pose(ex=1, ey=1, arm_f=hold, parts=[(BOOK, BX + 14, BY + 5)]), 160)], "loop": loop,
+            "outro": [(Pose(), 120)]}
+
+
 # ---------------------------------------------------------------- physics poses
 HELD = {s: Pose(eyes="wide", arm_f=("up_l", "up_r"), tent=t)
         for s, t in ((-1, "swing_l"), (0, "long"), (1, "swing_r"))}
@@ -1702,7 +1871,7 @@ def land():
 ANIMATIONS = {"ponder": ponder, "idle": idle, "working": working, "thinking": thinking, "question": question, "done": done,
               "sleeping": sleeping, "error": error, "happy": happy, "sad": sad,
               "held": held, "fall": fall, "land": land,
-              "hot": hot, "battery_low": battery_low, "charging": charging, "zap": zap, "ceiling": ceiling, "offline": offline,
+              "hot": hot, "battery_low": battery_low, "charging": charging, "zap": zap, "offline": offline,
               "hello": hello, "yawn": yawn, "dizzy": dizzy, "shy": shy,
               "call": call, "call_muted": lambda: call("muted"), "call_deaf": lambda: call("deaf"),
               "music": music, "look_around": look_around, "bubbles": bubbles, "read": read,
@@ -1713,16 +1882,24 @@ ANIMATIONS = {"ponder": ponder, "idle": idle, "working": working, "thinking": th
               "sunny": sunny, "snowy": snowy, "shiver": shiver, "cloudy": cloudy,
               "search": search, "terminal": terminal, "browse": browse, "todo": todo, "checkoff": checkoff, "tickled": tickled,
               "petted": petted, "trash_full": trash_full, "sweep": sweep, "warn": warn,
-              "cooking": cooking, "yoyo": yoyo, "juggle": juggle, "tea": tea, "gaming": gaming,
-              "paper_plane": paper_plane, "bubblegum": bubblegum, "doodle": doodle}
+              "cooking": cooking, "yoyo": yoyo, "juggle": juggle, "coffee": coffee, "gaming": gaming,
+              "paper_plane": paper_plane, "bubblegum": bubblegum, "doodle": doodle,
+              "float": float_idle, "tug": tug, "breathe": breathe, "hop_prep": hop_prep, "rise": rise, "sink": sink,
+              "startle": startle, "tickled_b": tickled_b, "petted_b": petted_b, "done_b": done_b,
+              "music_bop": music_bop, "calendar": calendar_page, "working_b": working_b, "search_b": search_b}
+
+# alternatives the player picks from when it starts one of these, so the same thing does not always look the same
+VARIANTS = {"done": ["done", "done_b"], "tickled": ["tickled", "tickled_b"], "petted": ["petted", "petted_b"],
+            "working": ["working", "working_b"], "search": ["search", "search_b"], "music": ["music", "music_bop"]}
 
 
 # how much slower the short reactions play so they can be seen without staring at the pet
 SLOWER = {"look_around": 1.8, "bubbles": 1.7, "sneeze": 1.8, "yawn": 1.4, "stretch": 1.4, "yoyo": 1.9,
           "juggle": 1.8, "gaming": 1.6, "paper_plane": 1.8, "bubblegum": 1.7, "doodle": 1.7, "hello": 1.6,
           "bye": 1.6, "shy": 1.6, "dizzy": 1.4, "camera": 1.6, "mail": 1.5, "reminder": 1.4, "tickled": 1.6,
-          "petted": 1.2, "trophy": 1.5, "tea": 1.2, "read": 1.1, "water": 1.2, "snack": 1.3, "nom": 1.3,
-          "happy": 1.4, "checkoff": 1.5, "zap": 1.3}
+          "petted": 1.2, "trophy": 1.5, "coffee": 1.2, "read": 1.1, "water": 1.2, "snack": 1.3, "nom": 1.3,
+          "happy": 1.4, "checkoff": 1.5, "zap": 1.3, "startle": 1.2, "calendar": 1.3, "tickled_b": 1.4,
+          "petted_b": 1.2}
 
 
 def slow_down(anim, k):

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Smellyfish - a pixel jellyfish for your desktop</title>
-<meta name="description" content="A tiny pixel-art jellyfish that lives on your Windows desktop and keeps an eye on Claude Code, Codex and your PC.">
+<meta name="description" content="A pixel-art jellyfish for your Windows desktop. It shows what Claude Code, Codex and your PC are doing, keeps your calendar and knows what music is playing.">
 <link rel="icon" href="media/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,6 +28,7 @@ body {
   padding-bottom: 80px; image-rendering: pixelated;
 }
 a { color: var(--light); }
+code { background: var(--ink); color: var(--light); padding: 1px 6px; }
 img { image-rendering: pixelated; max-width: 100%; height: auto; display: block; }
 html, body { overflow-x: hidden; }
 main { max-width: 980px; margin: 0 auto; padding: 56px 16px 40px; display: grid; grid-template-columns: minmax(0, 1fr);
@@ -54,7 +55,7 @@ main > section, .hero > *, .watch > *, .log li { min-width: 0; }
 .tilt-r { transform: rotate(1deg); }
 
 .kicker { font: 700 13px "Silkscreen", monospace; color: var(--dark); letter-spacing: 2px; margin: 0 0 6px; }
-h1 { font: 400 clamp(32px, 9vw, 100px)/0.95 "Silkscreen", monospace; margin: 4px 0 18px; letter-spacing: -1px;
+h1 { font: 400 clamp(28px, 6vw, 62px)/0.95 "Silkscreen", monospace; margin: 4px 0 18px; letter-spacing: -1px;
      overflow-wrap: anywhere; }
 h1 .accent { color: var(--dark); }
 h1 .ext { color: var(--lav); font-size: .55em; }
@@ -134,9 +135,9 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
       <div>
         <p class="kicker">Desktop pet // Windows 10 &middot; 11</p>
         <h1>SMELLY<span class="accent">FISH</span><span class="ext">.exe</span></h1>
-        <p>A tiny pixel jellyfish that floats around your desktop, sits on your windows (or hangs under them) and keeps an eye on
-          Claude Code, Codex and your PC. It answers questions in little speech bubbles, cooks up your code and
-          naps in its own bed when there's nothing to do.</p>
+        <p>A pixel jellyfish that sits on your windows and shows what Claude Code, Codex and your PC are doing.
+          Questions from Claude Code appear in speech bubbles you answer with a click. It keeps your calendar,
+          knows what music is playing, and when nothing is going on it naps in its own bed.</p>
         <div class="prompt">&gt; Smellyfish.exe</div>
         <div class="actions">
           <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.exe" download>Download</a>
@@ -151,7 +152,53 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
     <div class="bar"><span class="dot"></span>desktop.gif<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
     <div class="body">
       <img class="shot" src="media/desktop.gif" alt="Smellyfish on a desktop, asking a question in a speech bubble">
-      <p class="caption">// sits on your editor, asks before it acts, goes home to bed afterwards.</p>
+      <p class="caption">// sits on your editor, asks a question, goes home to bed afterwards.</p>
+    </div>
+  </section>
+
+  <section id="watch" class="win tilt-l">
+    <div class="bar"><span class="dot"></span>claude_codex.sys<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
+    <div class="body watch">
+      <div>
+        <h2>Next to your agent</h2>
+        <p>With the integration switched on, the jellyfish shows what Claude Code or Codex is doing and for how
+          long, and tells you when a task is done or needs you. Questions and permission prompts are answered
+          in the bubble; the little x sends them back to the terminal.</p>
+        <div class="status">
+          <div><i>?</i>searches the code with a magnifier or a book</div>
+          <div><i>&gt;_</i>runs a command in its terminal</div>
+          <div><i>~</i>puts the laptop away now and then for a cup of coffee</div>
+          <div><i>!</i>warns before your usage limit runs out</div>
+        </div>
+      </div>
+      <img src="media/bubbles.png" alt="Speech bubbles">
+    </div>
+  </section>
+
+  <section id="calendar" class="win tilt-r">
+    <div class="bar"><span class="dot"></span>calendar.ics<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
+    <div class="body">
+      <h2>Calendar</h2>
+      <p>Month, week and day views with your own events. Import an <code>.ics</code> file or paste a calendar link
+        from Google, Outlook, iCloud or your university timetable; links refresh every hour. The jellyfish
+        reminds you before an appointment and pulls out a calendar page when it starts. Removing an imported
+        calendar removes only its own events.</p>
+      <img class="shot" src="media/calendar.png" alt="The calendar window in month view with a subscribed university timetable">
+      <p class="caption">// to-dos and reminders show up too. Export as .ics, the to-do list also as Markdown or CSV.</p>
+    </div>
+  </section>
+
+  <section id="music" class="win tilt-l">
+    <div class="bar"><span class="dot"></span>music.wav<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
+    <div class="body">
+      <h2>Music and movement</h2>
+      <p>Whatever plays in Spotify, a browser or another player: the jellyfish puts on headphones, a note
+        appears in its badge, and a click on the note gives you play, pause and skip. It does not dance
+        all the time; it bops along for a while and then goes on with its day.</p>
+      <img class="shot" src="media/music.gif" alt="The jellyfish with headphones next to a bubble with play, pause and skip">
+      <p style="margin-top:22px">It hops like a jellyfish: it contracts, pushes off, the tentacles trail behind and
+        settle again after the landing.</p>
+      <img class="shot" src="media/tentacles.gif" alt="The jellyfish hopping, its tentacles trailing behind">
     </div>
   </section>
 
@@ -160,60 +207,42 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
     <div class="body">
       <h2>What it gets up to</h2>
       <ul class="log">
-        <li><b>window hopping</b><span>sits on visible window edges, jumps between them, climbs their sides and now and then hangs upside down under one</span></li>
-        <li><b>grab &amp; throw</b><span>dangles from a tentacle, swings, flies, lands with a squish</span></li>
-        <li><b>a home</b><span>lamp for do-not-disturb, a bed, a plant that tells you the weather</span></li>
-        <li><b>pc reactions</b><span>busy CPU, dances to music, Discord calls, full recycle bin, games in fullscreen, a cartoon zap when you plug in the charger</span></li>
+        <li><b>window hopping</b><span>sits on window edges, jumps between them, climbs their sides and hangs from a tentacle under one now and then</span></li>
+        <li><b>grab &amp; throw</b><span>dangles from your cursor, swings, flies and lands with a squish</span></li>
+        <li><b>a home</b><span>lamp for do-not-disturb, a bed, a plant that tells you the weather (optional)</span></li>
+        <li><b>pc reactions</b><span>busy CPU, Discord calls, a full recycle bin, fullscreen games, a cartoon zap from the charger</span></li>
+        <li><b>moods</b><span>livelier in the late morning, sleepy at night, startled when you switch windows very fast</span></li>
         <li><b>head pats</b><span>pet its head or tickle its tentacles with your cursor</span></li>
-        <li><b>toys &amp; trophies</b><span>a ball to fetch, fish snacks, focus timer and achievements</span></li>
-        <li><b>local chat</b><span>talk to your own Ollama or llama.cpp model; short, cute answers in a speech bubble, nothing leaves your PC</span></li>
-        <li><b>lan lobby</b><span>friends on your network step out of a door, drop by in their own colors and outfits and hand over letters, all encrypted</span></li>
+        <li><b>mini mode</b><span>peeks in from the screen edge; drag it up or down, pull it out to bring it back</span></li>
+        <li><b>toys &amp; trophies</b><span>a ball to fetch, fish snacks, a focus timer and achievements</span></li>
+        <li><b>local chat</b><span>talk to your own Ollama or llama.cpp model; nothing leaves your PC</span></li>
+        <li><b>lan lobby</b><span>friends on your network step out of a door in their own colors and hand over letters; encrypted</span></li>
       </ul>
       <img class="shot" style="margin-top:22px" src="media/animations.gif" alt="Animation overview">
     </div>
   </section>
 
-  <section id="watch" class="win tilt-l">
-    <div class="bar"><span class="dot"></span>claude_codex.sys<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
-    <div class="body watch">
-      <div>
-        <h2>Your coding buddy</h2>
-        <p>Switch on the integration and the jellyfish shows what Claude Code or Codex is doing, how long it
-          has been at it, and pings you when it's done or needs you. Questions and permission prompts can be
-          answered right from the bubble.</p>
-        <div class="status">
-          <div><i>?</i>searching the code with a magnifier</div>
-          <div><i>&gt;_</i>running a command in its terminal</div>
-          <div><i>~</i>cooking with a chef hat and a pan</div>
-          <div><i>!</i>warns before your usage limit runs out</div>
-        </div>
-      </div>
-      <img src="media/bubbles.png" alt="Speech bubbles">
+  <section id="tour" class="win tilt-r">
+    <div class="bar"><span class="dot"></span>setup.exe<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
+    <div class="body">
+      <h2>First start</h2>
+      <p>The jellyfish explains the basics in its bubbles and asks a few questions: Claude Code hooks, which
+        screen, whether it may roam, a home, weather, sounds and autostart. You can go back and change an
+        answer, and nothing is applied until you confirm on the last page.</p>
+      <img class="shot" src="media/tour.png" alt="Three tour bubbles: hello, a setup question with back and next, and the final check">
     </div>
   </section>
 
-  <section id="extras" class="win tilt-r">
+  <section id="extras" class="win tilt-l">
     <div class="bar"><span class="dot"></span>helpers.gif<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
     <div class="body">
-      <h2>Little helpers</h2>
-      <p>Discord mute and deafen status, messages, the weather at its plant, a focus timer, usage warnings,
-        a nudge when the recycle bin overflows, achievements and reminders. Timers and counters only pop up
-        when something changes or when you point at the jellyfish.</p>
-      <img class="shot" src="media/features.gif" alt="Discord status, weather, focus timer, usage limits, recycle bin, achievements, task timer, reminders, charging zap, hanging upside down, local chat and lobby visits">
-    </div>
-  </section>
-
-  <section id="visits" class="win tilt-l">
-    <div class="bar"><span class="dot"></span>visit.gif<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
-    <div class="body">
-      <h2>Friends drop by</h2>
-      <p>Open a lobby on your network and friends can join with a password. Their jellyfish steps out of a door
-        in their own colors and outfit, waves, and can hand over a letter. Chat, visits and letters are
-        encrypted and never leave your network. Optional, and nothing runs until you open a lobby.</p>
-      <img class="shot" src="media/visit.gif" alt="A friend's jellyfish steps out of a door and hands over a letter">
-      <p class="caption">There is also a chat with your own local Ollama or llama.cpp model: short, cute answers
-        in a speech bubble, code drawn as code, and the model unloads itself when idle. Everything comes in a dark
-        and a light look.</p>
+      <h2>More helpers</h2>
+      <p>Discord mute and deafen status, messages while Discord is minimized, the weather at its plant, a focus
+        timer, usage warnings, achievements and reminders. Timers and counters appear when something changes
+        or when you point at the jellyfish.</p>
+      <img class="shot" src="media/features.gif" alt="Discord status, weather, focus timer, usage limits, recycle bin, achievements, task timer, reminders, charging zap, calendar, local chat and lobby visits">
+      <img class="shot" style="margin-top:22px" src="media/visit.gif" alt="A friend's jellyfish steps out of a door and hands over a letter">
+      <p class="caption">// visits are optional; nothing listens until you open a lobby.</p>
     </div>
   </section>
 
@@ -222,15 +251,15 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
     <div class="body">
       <h2 style="color:var(--ink)">Get it</h2>
       <ol class="steps">
-        <li>Download <b>Smellyfish.exe</b> (the button starts the download of the latest version).</li>
-        <li>Run it. One portable file, nothing to install.</li>
-        <li>Right-click it in the tray to open the settings.</li>
+        <li>Download <b>Smellyfish.exe</b>; the button always gets the latest version.</li>
+        <li>Run it. It is a single portable file, there is nothing to install.</li>
+        <li>Follow the short tour. Later, right-click the jellyfish for the menu and the settings.</li>
       </ol>
       <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.exe" download>Download latest &rarr;</a>
       <a class="btn ghost" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases">All releases</a>
-      <p class="trust">Talks to Claude Code and Codex only on your own PC (127.0.0.1). Hooks are only added
-        when you switch them on. Updates come from this repository's releases and are checked before they are
-        installed.</p>
+      <p class="trust">Talks to Claude Code and Codex only on your own PC (127.0.0.1). Hooks are added only after
+        you agree. Calendar links are only downloaded, song info comes from Windows itself, and updates come from
+        this repository's releases, checked against a SHA-256 digest before they are installed.</p>
     </div>
   </section>
 </main>
@@ -239,10 +268,12 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
 <nav class="taskbar">
   <a href="#top" class="active"><img src="media/icon.png" alt="">smellyfish.exe</a>
   <a href="#demo">desktop.gif</a>
-  <a href="#tricks">tricks.log</a>
   <a href="#watch">claude_codex.sys</a>
+  <a href="#calendar">calendar.ics</a>
+  <a href="#music">music.wav</a>
+  <a href="#tricks">tricks.log</a>
+  <a href="#tour">setup.exe</a>
   <a href="#extras">helpers.gif</a>
-  <a href="#visits">visit.gif</a>
   <a href="#get">download</a>
   <span class="clock" id="clock"></span>
 </nav>

@@ -66,7 +66,7 @@ DEFAULTS = {
     "llm_idle_min": 5,
     "llm_unload_on_quit": True,
     "trips_home": True,
-    "show_house": True,
+    "show_house": False,
     "plant_watered_at": 0,
     "codex_hooks": False,
     "usage_warn": 80,
@@ -109,6 +109,7 @@ DEFAULTS = {
     "react_clipboard": True,
     "mini": False,
     "mini_side": "right",
+    "mini_lift": 0,
     "monitor": "primary",
     "task_timer": True,
     "talk_blips": True,
@@ -116,6 +117,16 @@ DEFAULTS = {
     "todos": [],
     "seen_version": "",
     "todo_greet": True,
+    "onboarded": False,
+    "calendars": [],
+    "calendar_view": "month",
+    "calendar_sidebar": False,
+    "calendar_show_todos": True,
+    "calendar_remind_min": 10,
+    "calendar_notified": {},
+    "media": True,
+    "media_exclude": [],
+    "tentacle_sim": True,
     "stats": {},
     "achievements": {},
 }
@@ -149,6 +160,8 @@ class Settings(dict):
                     break
             if data is not None:
                 dict.update(self, {k: v for k, v in data.items() if k in DEFAULTS})
+                if "onboarded" not in data:
+                    self["onboarded"] = True
                 self._backup()
                 log.info("loaded settings (house %s, %d achievements)", self.get("show_house"),
                          len(self.get("achievements") or {}))
@@ -220,6 +233,10 @@ class Settings(dict):
                 disk = {}
             merged = dict(DEFAULTS, **{k: v for k, v in disk.items() if k in DEFAULTS})
             merged.update({k: self[k] for k in self._dirty})
+            if "stats" in self._dirty:
+                merged["stats"] = merge_stats(disk.get("stats"), self["stats"])
+            if "achievements" in self._dirty:
+                merged["achievements"] = merge_unlocked(disk.get("achievements"), self["achievements"])
             tmp = PATH + f".{os.getpid()}.tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(merged, f, indent=2)
@@ -239,6 +256,36 @@ class Settings(dict):
     def set(self, key, value):
         self[key] = value
         self.save()
+
+
+def merge_stats(disk, mine):
+    """Counters only grow, so a stale copy (an old backup, a second process) can never lower them.
+    The daily click counter follows whichever side has the later day."""
+    disk, mine = dict(disk or {}) if isinstance(disk, dict) else {}, dict(mine or {})
+    out = dict(disk)
+    for k, v in mine.items():
+        old = out.get(k)
+        if k in ("clicks_today", "clicks_day"):
+            continue
+        if isinstance(v, (int, float)) and isinstance(old, (int, float)) and not isinstance(v, bool):
+            out[k] = max(old, v)
+        elif isinstance(v, str) and isinstance(old, str):
+            out[k] = max(old, v)
+        else:
+            out[k] = v
+    dd, md = str(disk.get("clicks_day") or ""), str(mine.get("clicks_day") or "")
+    if md > dd:
+        out["clicks_day"], out["clicks_today"] = md, mine.get("clicks_today", 0)
+    elif md == dd and md:
+        out["clicks_today"] = max(disk.get("clicks_today", 0), mine.get("clicks_today", 0))
+    return out
+
+
+def merge_unlocked(disk, mine):
+    out = dict(disk or {}) if isinstance(disk, dict) else {}
+    for k, t in (mine or {}).items():
+        out[k] = min(out[k], t) if isinstance(out.get(k), (int, float)) else t
+    return out
 
 
 @contextlib.contextmanager

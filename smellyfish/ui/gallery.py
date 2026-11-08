@@ -11,15 +11,19 @@ from smellyfish.art import sprite
 from smellyfish.ui import theme
 
 CATEGORIES = [
-    ("Claude & Codex", ["thinking", "working", "question", "done", "error", "exhausted", "warn"]),
-    ("Tools", ["search", "terminal", "browse", "todo", "cooking"]),
-    ("Moods", ["happy", "sad", "angry", "shy", "dizzy", "hello", "bye", "yawn", "tickled", "petted"]),
-    ("Idle", ["idle", "look_around", "bubbles", "read", "sneeze", "sleeping", "stretch", "yoyo", "juggle", "tea",
-              "gaming", "paper_plane", "bubblegum", "doodle"]),
-    ("PC & apps", ["hot", "battery_low", "charging", "offline", "music", "call", "call_muted", "call_deaf", "mail",
-                   "focus", "alarm"]),
-    ("Home & moving", ["water", "swim", "climb", "land", "fall", "held", "peek"]),
-    ("Toys & fun", ["snack", "nom", "checkoff", "camera", "trophy", "carry", "trash_full", "sweep"]),
+    ("Claude & Codex", ["thinking", "ponder", "working", "working_b", "question", "done", "done_b", "error",
+                        "exhausted", "warn"]),
+    ("Tools", ["search", "search_b", "terminal", "browse", "todo", "cooking"]),
+    ("Moods", ["happy", "sad", "angry", "shy", "startle", "dizzy", "hello", "bye", "yawn", "tickled", "tickled_b",
+               "petted", "petted_b"]),
+    ("Idle", ["idle", "float", "breathe", "look_around", "bubbles", "read", "sneeze", "sleeping", "stretch", "yoyo",
+              "juggle", "coffee", "gaming", "paper_plane", "bubblegum", "doodle"]),
+    ("Weather", ["sunny", "cloudy", "rainy", "snowy", "shiver"]),
+    ("PC & apps", ["hot", "battery_low", "charging", "zap", "offline", "music", "music_bop", "call", "call_muted",
+                   "call_deaf", "mail", "focus"]),
+    ("Calendar & reminders", ["calendar", "reminder", "alarm", "checkoff"]),
+    ("Home & moving", ["water", "hop_prep", "rise", "sink", "land", "fall", "swim", "climb", "held", "peek", "tug"]),
+    ("Toys & fun", ["snack", "nom", "camera", "trophy", "carry", "trash_full", "sweep"]),
 ]
 SCALE = 8
 BG = (34, 36, 48)

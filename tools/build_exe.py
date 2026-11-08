@@ -82,7 +82,10 @@ def main():
                 "--add-data", f"{os.path.join(ROOT, 'LICENSE')}{os.pathsep}.",
                 "--add-data", f"{os.path.join(ROOT, 'THIRD_PARTY_NOTICES.txt')}{os.pathsep}.",
                 "--collect-all", "soundcard",
+                "--collect-all", "winrt",
+                "--collect-data", "dateutil",
                 "--exclude-module", "tkinter", "--exclude-module", "matplotlib",
+                "--exclude-module", "pytest", "--exclude-module", "_pytest",
                 "--paths", ROOT,
                 "--distpath", DIST, "--workpath", os.path.join(BUILD, "main_work"),
                 "--specpath", BUILD, os.path.join(ROOT, "smellyfish", "__main__.py"))
