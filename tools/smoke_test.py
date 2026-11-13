@@ -142,12 +142,19 @@ def check_exe(exe, prefix=()):
         step("hook relay reaches the app")
         relay = os.path.join(HOME, "relay", "smellyfish-relay" + (".exe" if sys.platform == "win32" else ""))
         event = {"hook_event_name": "UserPromptSubmit", "session_id": "smoke", "prompt": "hi"}
-        r = subprocess.run([*prefix, relay], input=json.dumps(event).encode(), env=env, capture_output=True, timeout=30)
-        assert r.returncode == 0, r
-        for _ in range(40):
-            if post("/debug/state", {}).get("base") == "thinking":
-                break
-            time.sleep(0.25)
+        # the relay gives up after 2 s on purpose; a first start under Rosetta can be slower than that, so try again
+        for _attempt in range(4):
+            r = subprocess.run(
+                [*prefix, relay], input=json.dumps(event).encode(), env=env, capture_output=True, timeout=60
+            )
+            assert r.returncode == 0, r
+            for _ in range(40):
+                if post("/debug/state", {}).get("base") == "thinking":
+                    break
+                time.sleep(0.25)
+            else:
+                continue
+            break
         else:
             raise AssertionError("the hook event did not reach the app")
     finally:
