@@ -1,9 +1,10 @@
 """A tiny pixel-art input bubble next to the jellyfish: type, press Enter, the answer comes back as a speech bubble."""
+
 import time
 
 from PIL import Image, ImageDraw
 from PySide6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QRect, Qt, QTimer
-from PySide6.QtGui import QColor, QCursor, QFont, QGuiApplication, QPainter
+from PySide6.QtGui import QCursor, QFont, QPainter
 from PySide6.QtWidgets import QLineEdit, QWidget
 
 from smellyfish.art import bubble, sprite
@@ -25,8 +26,11 @@ def lighter(c, k=40):
 def button(d, box, text, fill, dark, hover=False, pressed=False, enabled=True, ink=bubble.INK):
     x0, y0, x1, y1 = box
     if not enabled:
-        fill, dark, ink = ((60, 52, 82), (48, 42, 66), (116, 106, 140)) if bubble.DARK else \
-            ((222, 220, 232), (196, 194, 210), (168, 164, 184))
+        fill, dark, ink = (
+            ((60, 52, 82), (48, 42, 66), (116, 106, 140))
+            if bubble.DARK
+            else ((222, 220, 232), (196, 194, 210), (168, 164, 184))
+        )
     elif hover:
         fill = lighter(fill, 28)
     if pressed and enabled:
@@ -87,6 +91,7 @@ class AskWindow(QWidget):
         super().__init__(None, Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
         self.app = app
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_MacAlwaysShowToolWindow)
         self.setMouseTracking(True)
         self.tail = "bottom"
         self.top = 0
@@ -100,8 +105,10 @@ class AskWindow(QWidget):
         self.edit.setMaxLength(2000)
         self.edit.setPlaceholderText("ask me anything...")
         self.edit.setFont(QFont("Cascadia Mono", 12, QFont.Bold))
-        self.edit.setStyleSheet("QLineEdit { background: transparent; color: #82e696; border: none; padding: 0 6px;"
-                                " selection-background-color: #8c60be; selection-color: #ffffff; }")
+        self.edit.setStyleSheet(
+            "QLineEdit { background: transparent; color: #82e696; border: none; padding: 0 6px;"
+            " selection-background-color: #8c60be; selection-color: #ffffff; }"
+        )
         self.edit.returnPressed.connect(self.send)
         self.edit.textChanged.connect(self.restyle)
         self.edit.installEventFilter(self)
@@ -126,9 +133,10 @@ class AskWindow(QWidget):
         return f"{name} - asleep", DOT_OFF
 
     def restyle(self):
-        from smellyfish.app import to_qimage
+        from smellyfish.ui.views import to_qimage
+
         caption, dot = self.caption()
-        if app_busy := bool(self.app.llm_phase):
+        if self.app.llm_phase:
             dot = DOT_BUSY if int(time.time() * 3) % 2 else (255, 230, 150)
         can = bool(self.edit.text().strip())
         key = (self.tail, self.hover, self.pressed, self.focus, can, caption, dot, bubble.DARK)
@@ -141,8 +149,9 @@ class AskWindow(QWidget):
         self.image = to_qimage(pil.resize((pil.width * dev, pil.height * dev), Image.NEAREST), dev / S)
         self.top = TAIL * S if self.tail == "top" else 0
         top = self.top
-        self.edit.setGeometry(FIELD[0] * S + 4, top + FIELD[1] * S + 4, (FIELD[2] - FIELD[0]) * S - 8,
-                              (FIELD[3] - FIELD[1]) * S - 8)
+        self.edit.setGeometry(
+            FIELD[0] * S + 4, top + FIELD[1] * S + 4, (FIELD[2] - FIELD[0]) * S - 8, (FIELD[3] - FIELD[1]) * S - 8
+        )
         self.update()
 
     def paintEvent(self, _):
@@ -257,8 +266,12 @@ class AskWindow(QWidget):
         return super().eventFilter(obj, e)
 
     def changeEvent(self, e):
-        if e.type() == e.Type.ActivationChange and not self.isActiveWindow() and self.isVisible() \
-                and time.time() - self.shown_at > 0.6:
+        if (
+            e.type() == e.Type.ActivationChange
+            and not self.isActiveWindow()
+            and self.isVisible()
+            and time.time() - self.shown_at > 0.6
+        ):
             self.closer.start(250)
         elif self.isActiveWindow():
             self.closer.stop()

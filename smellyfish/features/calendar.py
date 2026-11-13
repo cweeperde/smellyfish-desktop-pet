@@ -4,6 +4,7 @@ The list of calendars lives in the settings ("calendars"); the events of each ca
 (<home>/calendars/<id>.json), so removing a calendar never touches the others and the settings file stays small.
 Times are stored as local wall-clock time: "YYYY-MM-DDTHH:MM" for timed events, "YYYY-MM-DD" for all-day ones.
 """
+
 import datetime as dt
 import json
 import logging
@@ -21,12 +22,27 @@ from smellyfish.paths import HOME_DIR
 log = logging.getLogger("smellyfish.calendar")
 
 DIR = os.path.join(HOME_DIR, "calendars")
-COLOR_NAMES = [("#c492ec", "Lavender"), ("#78b8ff", "Sky"), ("#82e696", "Mint"), ("#ffb070", "Peach"),
-               ("#ff8aa8", "Pink"), ("#ffd250", "Sun"), ("#7fdcd0", "Lagoon"), ("#b0a4c8", "Pebble")]
+COLOR_NAMES = [
+    ("#c492ec", "Lavender"),
+    ("#78b8ff", "Sky"),
+    ("#82e696", "Mint"),
+    ("#ffb070", "Peach"),
+    ("#ff8aa8", "Pink"),
+    ("#ffd250", "Sun"),
+    ("#7fdcd0", "Lagoon"),
+    ("#b0a4c8", "Pebble"),
+]
 COLORS = [c for c, _name in COLOR_NAMES]
 FREQS = ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]
-REMIND = [("No reminder", None), ("At start", 0), ("5 min before", 5), ("10 min before", 10),
-          ("30 min before", 30), ("1 hour before", 60), ("1 day before", 1440)]
+REMIND = [
+    ("No reminder", None),
+    ("At start", 0),
+    ("5 min before", 5),
+    ("10 min before", 10),
+    ("30 min before", 30),
+    ("1 hour before", 60),
+    ("1 day before", 1440),
+]
 MAX_EVENTS = 20000
 FETCH_TIMEOUT = 20
 
@@ -136,8 +152,7 @@ def _prop(line):
 
 
 def _text(value):
-    return (value.replace("\\n", "\n").replace("\\N", "\n").replace("\\,", ",").replace("\\;", ";")
-            .replace("\\\\", "\\"))
+    return value.replace("\\n", "\n").replace("\\N", "\n").replace("\\,", ",").replace("\\;", ";").replace("\\\\", "\\")
 
 
 def _zone(name):
@@ -201,7 +216,11 @@ def parse_ics(text):
                     break
             continue
         if alarm is not None:
-            if key == "TRIGGER" and opts.get("VALUE", "DURATION") == "DURATION" and opts.get("RELATED", "START") == "START":
+            if (
+                key == "TRIGGER"
+                and opts.get("VALUE", "DURATION") == "DURATION"
+                and opts.get("RELATED", "START") == "START"
+            ):
                 alarm["TRIGGER"] = _duration(value)
             continue
         if cur is not None and depth and depth[-1] == "VEVENT":
@@ -244,10 +263,18 @@ def _event_from(cur):
         end = start + (dt.timedelta(days=1) if not isinstance(start, dt.datetime) else dt.timedelta(hours=1))
     if as_dt(end) < as_dt(start):
         end = start
-    ev = {"uid": (p.get("UID", ({}, ""))[1] or uuid.uuid4().hex), "title": _text(p.get("SUMMARY", ({}, ""))[1]) or "(no title)",
-          "start": fmt(start), "end": fmt(end), "all_day": not isinstance(start, dt.datetime),
-          "location": _text(p.get("LOCATION", ({}, ""))[1]), "notes": _text(p.get("DESCRIPTION", ({}, ""))[1])[:4000],
-          "remind": cur["alarm"], "rrule": p.get("RRULE", ({}, ""))[1], "exdates": cur["exdates"]}
+    ev = {
+        "uid": (p.get("UID", ({}, ""))[1] or uuid.uuid4().hex),
+        "title": _text(p.get("SUMMARY", ({}, ""))[1]) or "(no title)",
+        "start": fmt(start),
+        "end": fmt(end),
+        "all_day": not isinstance(start, dt.datetime),
+        "location": _text(p.get("LOCATION", ({}, ""))[1]),
+        "notes": _text(p.get("DESCRIPTION", ({}, ""))[1])[:4000],
+        "remind": cur["alarm"],
+        "rrule": p.get("RRULE", ({}, ""))[1],
+        "exdates": cur["exdates"],
+    }
     if "RECURRENCE-ID" in p:
         try:
             ev["_override"] = fmt(_when(p["RECURRENCE-ID"][1], p["RECURRENCE-ID"][0]))
@@ -288,8 +315,14 @@ def to_ics(calendars):
         lines.append(f"X-WR-CALNAME:{_esc(calendars[0][0])}")
     for _name, events in calendars:
         for ev in events:
-            lines += ["BEGIN:VEVENT", f"UID:{ev['uid']}", f"DTSTAMP:{stamp}", f"SUMMARY:{_esc(ev['title'])}",
-                      "DTSTART" + _ics_time(ev["start"]), "DTEND" + _ics_time(ev["end"])]
+            lines += [
+                "BEGIN:VEVENT",
+                f"UID:{ev['uid']}",
+                f"DTSTAMP:{stamp}",
+                f"SUMMARY:{_esc(ev['title'])}",
+                "DTSTART" + _ics_time(ev["start"]),
+                "DTEND" + _ics_time(ev["end"]),
+            ]
             if ev.get("location"):
                 lines.append(f"LOCATION:{_esc(ev['location'])}")
             if ev.get("notes"):
@@ -299,8 +332,13 @@ def to_ics(calendars):
             for ex in ev.get("exdates") or []:
                 lines.append("EXDATE" + _ics_time(ex))
             if ev.get("remind") is not None:
-                lines += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{_esc(ev['title'])}",
-                          f"TRIGGER:-PT{int(ev['remind'])}M", "END:VALARM"]
+                lines += [
+                    "BEGIN:VALARM",
+                    "ACTION:DISPLAY",
+                    f"DESCRIPTION:{_esc(ev['title'])}",
+                    f"TRIGGER:-PT{int(ev['remind'])}M",
+                    "END:VALARM",
+                ]
             lines.append("END:VEVENT")
     lines.append("END:VCALENDAR")
     return "\r\n".join(_fold(line) for line in lines) + "\r\n"
@@ -355,8 +393,13 @@ class Calendars:
     def add(self, name, kind, url="", events=None, save=True):
         used = {c["color"] for c in self.meta}
         color = next((c for c in COLORS if c not in used), COLORS[len(self.meta) % len(COLORS)])
-        cal = {"id": uuid.uuid4().hex[:12], "name": name[:60] or "Calendar", "kind": kind, "color": color,
-               "visible": True}
+        cal = {
+            "id": uuid.uuid4().hex[:12],
+            "name": name[:60] or "Calendar",
+            "kind": kind,
+            "color": color,
+            "visible": True,
+        }
         if kind == "sub":
             cal.update(url=url, refresh_min=60, fetched=0, error="")
         self.meta.append(cal)
@@ -445,8 +488,13 @@ class Calendars:
 
     # subscriptions
     def due_refresh(self, now):
-        return [c for c in self.meta if c["kind"] == "sub" and c["id"] not in self._busy
-                and now - float(c.get("fetched") or 0) > int(c.get("refresh_min") or 60) * 60]
+        return [
+            c
+            for c in self.meta
+            if c["kind"] == "sub"
+            and c["id"] not in self._busy
+            and now - float(c.get("fetched") or 0) > int(c.get("refresh_min") or 60) * 60
+        ]
 
     def fetch(self, cid):
         cal = self.get(cid)
@@ -463,7 +511,9 @@ class Calendars:
         try:
             if not url.lower().startswith(("https://", "http://")):
                 raise ValueError("The link has to start with https://, http:// or webcal://")
-            req = urllib.request.Request(url, headers={"User-Agent": "Smellyfish calendar", "Accept": "text/calendar, */*"})
+            req = urllib.request.Request(
+                url, headers={"User-Agent": "Smellyfish calendar", "Accept": "text/calendar, */*"}
+            )
             with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as r:
                 data = r.read(20 * 1024 * 1024 + 1)
             if len(data) > 20 * 1024 * 1024:
@@ -480,6 +530,7 @@ class Calendars:
     def fetched(self, cid, name, events, error):
         """Called on the Qt thread with the download result."""
         import time
+
         self._busy.discard(cid)
         cal = self.get(cid)
         if cal is None:

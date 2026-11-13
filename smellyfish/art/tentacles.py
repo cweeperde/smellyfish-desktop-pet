@@ -1,5 +1,6 @@
 """Simulated tentacles for movement: four little chains of points that trail behind the body and settle when it
 stops. The result is rounded to whole pixels so it keeps the pixel look."""
+
 import math
 
 SEGS = 4

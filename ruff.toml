@@ -1,0 +1,17 @@
+line-length = 120
+target-version = "py313"
+extend-exclude = ["build", "dist", "dev"]
+
+[lint]
+select = ["E", "F", "W", "I"]
+# small local lambdas and short loop names are used on purpose
+ignore = ["E731", "E741"]
+
+[lint.per-file-ignores]
+# theme.py fills its colour names into the module at runtime (set_dark)
+"smellyfish/ui/theme.py" = ["F821", "E501"]
+"smellyfish/art/sprite.py" = ["E501"]
+"designer/animation_designer.py" = ["E402"]
+
+[format]
+exclude = ["smellyfish/art/sprite.py"]

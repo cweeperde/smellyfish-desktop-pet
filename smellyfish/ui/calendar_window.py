@@ -1,13 +1,35 @@
 """Calendar window: month and week view, calendar list (import, subscribe, export, remove) and the event editor."""
+
 import datetime as dt
 import uuid
 
-from PySide6.QtCore import QDate, QPoint, QRect, QSize, Qt, QTime
+from PySide6.QtCore import QDate, QRect, QSize, Qt, QTime
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import (QAbstractSpinBox, QCheckBox, QComboBox, QDateEdit, QDialog, QFileDialog, QFormLayout, QHBoxLayout,
-                               QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox,
-                               QPlainTextEdit, QPushButton, QScrollArea, QSpinBox, QStackedWidget, QTimeEdit,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QAbstractSpinBox,
+    QCheckBox,
+    QComboBox,
+    QDateEdit,
+    QDialog,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMenu,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QStackedWidget,
+    QTimeEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from smellyfish.art import sprite
 from smellyfish.features import calendar as calmod
@@ -17,13 +39,36 @@ from smellyfish.ui import theme
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 HOUR_H = 44
 TIME_W = 52
-PAGE = sprite.Pose(ex=1, ey=-1, arm_f=("rest_l", "up_r"),
-                   parts=[(["RRRRRR", "WWWWWW", "WOWOWW", "WWWWWW", "WWOWOW", "WWWWWW"], sprite.BX + 16, sprite.BY)])
+PAGE = sprite.Pose(
+    ex=1,
+    ey=-1,
+    arm_f=("rest_l", "up_r"),
+    parts=[(["RRRRRR", "WWWWWW", "WOWOWW", "WWWWWW", "WWOWOW", "WWWWWW"], sprite.BX + 16, sprite.BY)],
+)
+
+
+ICONS = {
+    "clock": [".#####.", "#.....#", "#..#..#", "#..##.#", "#.....#", "#.....#", ".#####."],
+    "pin": [".###.", "##.##", "#...#", "##.##", ".###.", "..#..", "..#.."],
+}
+
+
+def draw_icon(p, name, x, y, h, color):
+    """A tiny pixel icon, vertically centred in a line of height h starting at y; returns its width."""
+    rows = ICONS[name]
+    top = y + (h - len(rows)) // 2
+    c = QColor(color)
+    for r, row in enumerate(rows):
+        for col, ch in enumerate(row):
+            if ch == "#":
+                p.fillRect(x + col, top + r, 1, 1, c)
+    return len(rows[0])
 
 
 def swatch(color, selected):
     """A little color square for menus, with a frame around the chosen one."""
     from PySide6.QtGui import QIcon, QPixmap
+
     pix = QPixmap(18, 18)
     pix.fill(QColor(0, 0, 0, 0))
     p = QPainter(pix)
@@ -71,13 +116,15 @@ def items_between(app, lo, hi):
             if t.get("due"):
                 s = dt.datetime.fromtimestamp(t["due"])
                 if lo <= s < hi:
-                    out.append(Item(s, s + dt.timedelta(minutes=30), "To-do: " + t["text"], theme.WARN, False,
-                                    kind="todo"))
+                    out.append(
+                        Item(s, s + dt.timedelta(minutes=30), "To-do: " + t["text"], theme.WARN, False, kind="todo")
+                    )
         for r in app.cfg.get("reminders") or []:
             s = dt.datetime.fromtimestamp(r["due"])
             if lo <= s < hi:
-                out.append(Item(s, s + dt.timedelta(minutes=30), "Reminder: " + r["text"], theme.WARN, False,
-                                kind="reminder"))
+                out.append(
+                    Item(s, s + dt.timedelta(minutes=30), "Reminder: " + r["text"], theme.WARN, False, kind="reminder")
+                )
     out.sort(key=lambda i: (not i.all_day, i.start, i.title.lower()))
     return out
 
@@ -103,18 +150,21 @@ def _chip(p, rect, item, font_px=11, block=False):
         line = p.fontMetrics().height()
         short = inner.height() < 2 * line
         title = f"{item.title} @ {item.place}" if short and item.place else item.title
-        p.drawText(QRect(inner.left(), inner.top(), inner.width(), line), Qt.AlignLeft | Qt.TextSingleLine,
-                   elide(title))
+        p.drawText(
+            QRect(inner.left(), inner.top(), inner.width(), line), Qt.AlignLeft | Qt.TextSingleLine, elide(title)
+        )
         if short:
             return
-        extra = [] if item.all_day else [f"{item.start:%H:%M} - {item.end:%H:%M}"]
+        extra = [] if item.all_day else [("clock", f"{item.start:%H:%M} - {item.end:%H:%M}")]
         if item.place:
-            extra.insert(0, item.place)
-        p.setPen(QColor(theme.MUTED))
-        for n, text in enumerate(extra, 1):
+            extra.append(("pin", item.place))
+        for n, (icon, text) in enumerate(extra, 1):
             if inner.height() >= (n + 1) * line:
-                p.drawText(QRect(inner.left(), inner.top() + n * line, inner.width(), line),
-                           Qt.AlignLeft | Qt.TextSingleLine, elide(text))
+                y = inner.top() + n * line
+                w = draw_icon(p, icon, inner.left(), y, line, theme.MUTED) + 4
+                p.setPen(QColor(theme.MUTED))
+                shown = p.fontMetrics().elidedText(text, Qt.ElideRight, max(10, inner.width() - w))
+                p.drawText(QRect(inner.left() + w, y, inner.width() - w, line), Qt.AlignLeft | Qt.TextSingleLine, shown)
         return
     p.setPen(QColor(theme.TEXT))
     p.drawText(inner, Qt.AlignVCenter | Qt.AlignLeft | Qt.TextSingleLine, elide(item.label))
@@ -187,7 +237,7 @@ class MonthView(QWidget):
             day_items = per_day.get(d, [])
             y = r.top() + 22
             room = max(0, int((r.bottom() - y - 2) // 17))
-            shown = day_items if len(day_items) <= room else day_items[:max(0, room - 1)]
+            shown = day_items if len(day_items) <= room else day_items[: max(0, room - 1)]
             for it in shown:
                 rect = QRect(r.left() + 3, y, r.width() - 6, 15)
                 _chip(p, rect, it)
@@ -254,7 +304,9 @@ class WeekGrid(QWidget):
         p.fillRect(self.rect(), QColor(theme.FIELD))
         start = self.win.span_start()
         lo = dt.datetime.combine(start, dt.time())
-        items = [i for i in items_between(self.win.app, lo, lo + dt.timedelta(days=self.win.span_days())) if not i.all_day]
+        items = [
+            i for i in items_between(self.win.app, lo, lo + dt.timedelta(days=self.win.span_days())) if not i.all_day
+        ]
         cw = self.col_w()
         f = QFont(p.font())
         f.setPixelSize(11)
@@ -292,8 +344,12 @@ class WeekGrid(QWidget):
                 y0 = (s - day_lo).total_seconds() / 3600 * HOUR_H
                 y1 = (e - day_lo).total_seconds() / 3600 * HOUR_H
                 w = (cw - 4) / cols
-                rect = QRect(round(TIME_W + k * cw + 2 + col * w), round(y0) + 1, max(8, round(w) - 2),
-                             max(15, round(y1 - y0) - 2))
+                rect = QRect(
+                    round(TIME_W + k * cw + 2 + col * w),
+                    round(y0) + 1,
+                    max(8, round(w) - 2),
+                    max(15, round(y1 - y0) - 2),
+                )
                 _chip(p, rect, it, block=True)
                 self.hits.append((rect, it))
         now = dt.datetime.now()
@@ -308,9 +364,11 @@ class WeekGrid(QWidget):
     def _columns(items, lo, hi):
         """Overlapping events side by side: [(item, column, number of columns in its group)]."""
         out, group, ends = [], [], []
+
         def flush():
             n = max((c for _i, c in group), default=-1) + 1
             out.extend((i, c, n) for i, c in group)
+
         for it in sorted(items, key=lambda i: i.start):
             end = max(it.end, it.start + dt.timedelta(minutes=20))
             if group and it.start >= max(ends):
@@ -398,7 +456,11 @@ class WeekHeader(QWidget):
                 p.setPen(QColor(theme.INK))
             else:
                 p.setPen(QColor(theme.TEXT if d.weekday() < 5 else theme.MUTED))
-            p.drawText(r, Qt.AlignCenter, f"{DAYS[d.weekday()]} {d.day}.{d.month}." if self.win.span_days() > 1 else d.strftime("%A, %d %B %Y"))
+            p.drawText(
+                r,
+                Qt.AlignCenter,
+                f"{DAYS[d.weekday()]} {d.day}.{d.month}." if self.win.span_days() > 1 else d.strftime("%A, %d %B %Y"),
+            )
         p.setPen(QColor(theme.MUTED))
         f.setBold(False)
         f.setPixelSize(10)
@@ -453,8 +515,13 @@ class WeekView(QWidget):
 
 # ---------------------------------------------------------------- event editor
 class EventDialog(QDialog):
-    REPEATS = [("Does not repeat", ""), ("Every day", "DAILY"), ("Every week", "WEEKLY"), ("Every month", "MONTHLY"),
-               ("Every year", "YEARLY")]
+    REPEATS = [
+        ("Does not repeat", ""),
+        ("Every day", "DAILY"),
+        ("Every week", "WEEKLY"),
+        ("Every month", "MONTHLY"),
+        ("Every year", "YEARLY"),
+    ]
 
     def __init__(self, win, ev=None, cal=None, start=None, occurrence=None):
         super().__init__(win)
@@ -579,8 +646,20 @@ class EventDialog(QDialog):
             note.setObjectName("hint")
             note.setWordWrap(True)
             root.addWidget(note)
-            for w in (self.title, self.cal, self.all_day, self.sd, self.st, self.ed, self.et, self.loc, self.repeat,
-                      self.every, self.until_on, self.until):
+            for w in (
+                self.title,
+                self.cal,
+                self.all_day,
+                self.sd,
+                self.st,
+                self.ed,
+                self.et,
+                self.loc,
+                self.repeat,
+                self.every,
+                self.until_on,
+                self.until,
+            ):
                 w.setEnabled(False)
             self.notes.setReadOnly(True)
             self.remind.setEnabled(False)
@@ -638,9 +717,18 @@ class EventDialog(QDialog):
         else:
             until = pydate(self.until.date()) if self.until_on.isChecked() else None
             rule = calmod.simple_rule(freq, self.every.value(), until)
-        ev = dict(self.ev or {}, uid=(self.ev or {}).get("uid") or uuid.uuid4().hex, title=title, start=fmt(start),
-                  end=fmt(end), all_day=self.all_day.isChecked(), location=self.loc.text().strip(),
-                  notes=self.notes.toPlainText().strip()[:4000], remind=self.remind.currentData(), rrule=rule)
+        ev = dict(
+            self.ev or {},
+            uid=(self.ev or {}).get("uid") or uuid.uuid4().hex,
+            title=title,
+            start=fmt(start),
+            end=fmt(end),
+            all_day=self.all_day.isChecked(),
+            location=self.loc.text().strip(),
+            notes=self.notes.toPlainText().strip()[:4000],
+            remind=self.remind.currentData(),
+            rrule=rule,
+        )
         if rule != (self.ev or {}).get("rrule", "") or not rule:
             ev["exdates"] = [] if not rule else ev.get("exdates", [])
         self.app.calendars.save_event(self.cal.currentData(), ev)
@@ -735,7 +823,11 @@ class CalendarWindow(QWidget):
         self.todos_box.setChecked(bool(app.cfg.get("calendar_show_todos", True)))
         self.todos_box.toggled.connect(lambda on: (app.cfg.set("calendar_show_todos", on), self.update_views()))
         side.addWidget(self.todos_box)
-        for label, fn in (("Import .ics file...", self.import_file), ("Subscribe to a link...", self.subscribe)):
+        for label, fn in (
+            ("New calendar...", self.new_calendar),
+            ("Import .ics file...", self.import_file),
+            ("Subscribe to a link...", self.subscribe),
+        ):
             b = QPushButton(label)
             b.setObjectName("secondary")
             b.clicked.connect(fn)
@@ -747,8 +839,10 @@ class CalendarWindow(QWidget):
         exp.setMenu(self.exp_menu)
         exp.setProperty("menu", "1")
         side.addWidget(exp)
-        hint = QLabel("Right-click a calendar to rename, recolor, refresh or remove it. Removing a calendar only "
-                      "removes its own events.")
+        hint = QLabel(
+            "Right-click a calendar to rename, recolor, refresh or remove it. Removing a calendar only "
+            "removes its own events."
+        )
         hint.setObjectName("hint")
         hint.setWordWrap(True)
         hint.setFixedWidth(220)
@@ -850,8 +944,12 @@ class CalendarWindow(QWidget):
             it.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsUserCheckable)
             it.setCheckState(Qt.Checked if c.get("visible", True) else Qt.Unchecked)
             it.setForeground(QColor(c["color"]))
-            tip = {"local": "Your own calendar", "import": "Imported from a file, editable",
-                   "sub": "Subscribed link, refreshed every hour, read-only"}[c["kind"]]
+            tip = {
+                "local": "Your default calendar",
+                "own": "Your own calendar, you can add events to it",
+                "import": "Imported from a file, editable",
+                "sub": "Subscribed link, refreshed every hour, read-only",
+            }[c["kind"]]
             if c.get("error"):
                 tip += f"\nLast refresh failed: {c['error']}"
             it.setToolTip(tip)
@@ -891,6 +989,7 @@ class CalendarWindow(QWidget):
 
     def pick_color(self, cid):
         from PySide6.QtWidgets import QColorDialog
+
         c = QColorDialog.getColor(QColor(self.app.calendars.get(cid)["color"]), self, "Calendar color")
         if c.isValid():
             self.set_color(cid, c.name())
@@ -905,11 +1004,19 @@ class CalendarWindow(QWidget):
     def remove_cal(self, cid):
         cal = self.app.calendars.get(cid)
         n = len(self.app.calendars.events.get(cid, []))
-        ok = QMessageBox.question(self, "Smellyfish", f"Remove \"{cal['name']}\" and its {n} events? "
-                                  "Your other calendars stay as they are.")
+        ok = QMessageBox.question(
+            self, "Smellyfish", f'Remove "{cal["name"]}" and its {n} events? Your other calendars stay as they are.'
+        )
         if ok == QMessageBox.Yes:
             self.app.calendars.remove(cid)
             self.app.calendar_changed()
+
+    def new_calendar(self):
+        name, ok = QInputDialog.getText(self, "Smellyfish - New calendar", "Name (for example Birthdays or Work):")
+        if not ok or not name.strip():
+            return
+        self.app.calendars.add(name.strip(), "own")
+        self.app.calendar_changed()
 
     def import_file(self):
         path, _ = QFileDialog.getOpenFileName(self, "Import a calendar", "", "Calendar (*.ics *.ical);;All files (*)")
@@ -921,12 +1028,15 @@ class CalendarWindow(QWidget):
             QMessageBox.warning(self, "Smellyfish", f"Could not import that file:\n{e}")
             return
         n = len(self.app.calendars.events[cal["id"]])
-        QMessageBox.information(self, "Smellyfish", f"Imported {n} events into \"{cal['name']}\".")
+        QMessageBox.information(self, "Smellyfish", f'Imported {n} events into "{cal["name"]}".')
         self.app.calendar_changed()
 
     def subscribe(self):
-        url, ok = QInputDialog.getText(self, "Smellyfish - Subscribe", "Calendar link (ends in .ics, webcal:// "
-                                       "works too).\nIt is downloaded every hour; nothing else is sent:")
+        url, ok = QInputDialog.getText(
+            self,
+            "Smellyfish - Subscribe",
+            "Calendar link (ends in .ics, webcal:// works too).\nIt is downloaded every hour; nothing else is sent:",
+        )
         url = url.strip()
         if not ok or not url:
             return
@@ -947,11 +1057,14 @@ class CalendarWindow(QWidget):
 
     def fill_export(self):
         self.exp_menu.clear()
-        self.exp_menu.addAction("All calendars in one file...", lambda: self.export(
-            [c["id"] for c in self.app.calendars.meta]))
+        self.exp_menu.addAction(
+            "All calendars in one file...", lambda: self.export([c["id"] for c in self.app.calendars.meta])
+        )
         self.exp_menu.addSeparator()
         for c in self.app.calendars.meta:
-            self.exp_menu.addAction(c["name"].replace("&", "&&") + "...", lambda _c=False, cid=c["id"]: self.export([cid]))
+            self.exp_menu.addAction(
+                c["name"].replace("&", "&&") + "...", lambda _c=False, cid=c["id"]: self.export([cid])
+            )
 
     def export(self, cids):
         name = self.app.calendars.get(cids[0])["name"] if len(cids) == 1 else "smellyfish-calendars"

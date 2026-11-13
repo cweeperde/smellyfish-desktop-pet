@@ -1,18 +1,38 @@
 """The to-do list window."""
+
 import time
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QMenu, QMessageBox, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFileDialog,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from smellyfish.art import sprite
 from smellyfish.features import export
 from smellyfish.features.todos import fmt_due
 from smellyfish.ui import theme
 
-PRESETS = [("No reminder", None), ("In 15 min", 15), ("In 1 hour", 60), ("In 3 hours", 180),
-           ("Tomorrow 9:00", "tomorrow"), ("At a time...", "at")]
+PRESETS = [
+    ("No reminder", None),
+    ("In 15 min", 15),
+    ("In 1 hour", 60),
+    ("In 3 hours", 180),
+    ("Tomorrow 9:00", "tomorrow"),
+    ("At a time...", "at"),
+]
 
 
 def tomorrow_nine():
@@ -60,8 +80,9 @@ class TodoWindow(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 12)
         root.setSpacing(8)
-        board = sprite.Pose(ex=1, ey=1, arm_f=("rest_l", "up_r"),
-                            parts=[(sprite._clipboard(2), sprite.BX + 16, sprite.BY)])
+        board = sprite.Pose(
+            ex=1, ey=1, arm_f=("rest_l", "up_r"), parts=[(sprite._clipboard(2), sprite.BX + 16, sprite.BY)]
+        )
         root.addWidget(theme.banner("To-do", "Things to get done", board))
 
         body = QVBoxLayout()
@@ -94,8 +115,9 @@ class TodoWindow(QWidget):
         self.list.model().rowsMoved.connect(self.moved)
         body.addWidget(self.list, 1)
 
-        hint = QLabel("Tick a task to finish it. Double-click to rename, right-click for reminders, "
-                      "drag to reorder, Del removes.")
+        hint = QLabel(
+            "Tick a task to finish it. Double-click to rename, right-click for reminders, drag to reorder, Del removes."
+        )
         hint.setObjectName("hint")
         hint.setWordWrap(True)
         body.addWidget(hint)

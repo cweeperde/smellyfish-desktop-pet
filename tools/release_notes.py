@@ -1,5 +1,6 @@
 """Prints the release notes of one version as markdown: python tools/release_notes.py 1.3.1
 With --versions it lists all versions that have notes."""
+
 import os
 import sys
 

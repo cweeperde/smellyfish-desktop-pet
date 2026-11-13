@@ -4,6 +4,7 @@ render(spec) returns (RGBA image, hit areas). Hit areas are (x0, y0, x1, y1, val
 in image pixels. One UI unit is UNIT screen pixels. Long text makes the bubble wider;
 if it still does not fit, a "Show all" link expands it (spec["expanded"]).
 """
+
 import re
 
 from PIL import Image, ImageDraw, ImageFont
@@ -18,6 +19,8 @@ SPACE = int(FONT.getlength(" "))
 def draw_text(d, pos, text, font=FONT, fill=None):
     """The bitmap font cuts off the left arm of a leading T; a leading space avoids that."""
     d.text((pos[0] - SPACE, pos[1]), " " + text, font=font, fill=fill)
+
+
 LINE = 12
 TAIL_H = 8
 TAIL_W = 9
@@ -33,8 +36,20 @@ CODE_BG = (30, 32, 48)
 GREEN = (130, 230, 150)
 YELLOW = (255, 210, 80)
 SHADOW = (14, 16, 28, 150)
-CHIP = {"ask": LAV, "perm": YELLOW, "done": GREEN, "wait": LAV, "focus": (255, 160, 60), "reminder": YELLOW,
-        "discord": (150, 160, 255), "todo": (130, 200, 150), "media": (240, 150, 210), "onboard": LAV, "trophy": YELLOW, "critical": (255, 110, 110)}
+CHIP = {
+    "ask": LAV,
+    "perm": YELLOW,
+    "done": GREEN,
+    "wait": LAV,
+    "focus": (255, 160, 60),
+    "reminder": YELLOW,
+    "discord": (150, 160, 255),
+    "todo": (130, 200, 150),
+    "media": (240, 150, 210),
+    "onboard": LAV,
+    "trophy": YELLOW,
+    "critical": (255, 110, 110),
+}
 
 TEXT = INK
 RULE = (228, 224, 240)
@@ -229,8 +244,10 @@ class Layout:
 
     def option(self, label, value, primary, desc):
         """A full-width answer button with its description underneath."""
-        self._button(self.x, self.w, clean(label), value, primary)
-        self.y += 16
+        label = clean(label)
+        rows = wrap(label, self.w - 6, 2)[0] if text_w(label) > self.w - 6 else [label]
+        self._button(self.x, self.w, label, value, primary, rows)
+        self.y += 16 + LINE * (len(rows) - 1)
         if desc:
             self.text(desc, max_lines=3, color=GREY, indent=4)
             self.y -= 1
@@ -249,23 +266,29 @@ class Layout:
     def label_w(label):
         return text_w(label) + (ICON_W if label in ICONS else 0)
 
-    def _button(self, x, w, label, value, primary):
-        """A raised button; while it is held down (pressed) it sinks into its edge."""
+    def _button(self, x, w, label, value, primary, rows=None):
+        """A raised button; while it is held down (pressed) it sinks into its edge. rows: a label wrapped onto lines."""
+        more = LINE * (len(rows) - 1) if rows else 0
         fill, edge = (LAV, LAV_D) if primary else (SEC, SEC_D)
         y = self.y
         down = self.pressed is not None and self.pressed == value
         if down:
             fill = LAV_D if primary else SEC_D
-            rrect(self.d, x, y + 2, x + w - 1, y + 14, fill)
+            rrect(self.d, x, y + 2, x + w - 1, y + 14 + more, fill)
             top = y + 2
         else:
-            rrect(self.d, x, y, x + w - 1, y + 14, edge)
-            rrect(self.d, x, y, x + w - 1, y + 12, fill)
+            rrect(self.d, x, y, x + w - 1, y + 14 + more, edge)
+            rrect(self.d, x, y, x + w - 1, y + 12 + more, fill)
             top = y
         icon = ICONS.get(label)
         while text_w(label) > w - 6 - (ICON_W if icon else 0) and len(label) > 3:
             label = label[:-4] + "..."
         ink = INK if primary else TEXT
+        if more:
+            for k, line in enumerate(rows):
+                draw_text(self.d, (x + (w - text_w(line)) // 2, top + 1 + k * LINE), line, font=FONT, fill=ink)
+            self.hits.append((x, y, x + w - 1, y + 14 + more, value))
+            return
         tx = x + (w - text_w(label) - (ICON_W if icon else 0)) // 2
         if icon:
             for gy, row in enumerate(icon):
@@ -376,6 +399,12 @@ def width_for(spec):
         return WIDE
     if spec.get("kind") in ("ask", "perm") or spec.get("detail"):
         return WIDTH
+    lines = [ln for ln in str(spec.get("text", "")).split("\n") if ln.strip()]
+    if len(lines) > 1:
+        # text written as lines (weather, file details) stays in those lines when a little more room does it
+        longest = max(text_w(clean(ln)) for ln in lines) + 2 * PAD + 2
+        if WIDTH < longest <= WIDE:
+            return longest
     need = text_w(clean(text)) + 2 * PAD + 2
     chip = text_w(clean(spec.get("chip", ""))) + text_w(clean(spec.get("right", ""))) + 2 * PAD + 20 + CLOSE_W
     buttons = sum(text_w(clean(b[0])) + 14 for b in spec.get("buttons") or [("OK", "ok", True)]) + 2 * PAD + 4
@@ -385,8 +414,9 @@ def width_for(spec):
 def size(spec):
     """(width, body height) of a bubble in UI units, without the tail."""
     width = width_for(spec)
-    probe = Layout(ImageDraw.Draw(Image.new("RGB", (width, 2000))), PAD, PAD, width - 2 * PAD,
-                   bool(spec.get("expanded")))
+    probe = Layout(
+        ImageDraw.Draw(Image.new("RGB", (width, 2000))), PAD, PAD, width - 2 * PAD, bool(spec.get("expanded"))
+    )
     content(probe, spec)
     return width, probe.y - 3 + PAD
 

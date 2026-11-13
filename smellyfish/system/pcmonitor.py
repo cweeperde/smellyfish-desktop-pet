@@ -1,17 +1,19 @@
 """Watches the PC: CPU load, input idle time, battery, internet, fullscreen apps, screen lock,
 Spotify playback and time of day."""
+
 import ctypes
-import socket
 import sys
 import threading
 import time
 from collections import deque
-from ctypes import wintypes
 
 import psutil
 from PySide6.QtCore import QObject, QTimer, Signal
 
+from smellyfish.system.wincompat import wintypes
+
 IS_WIN = sys.platform == "win32"
+IS_MAC = sys.platform == "darwin"
 CPU_BUSY, CPU_CALM = 50, 30
 
 
@@ -20,11 +22,19 @@ class LASTINPUTINFO(ctypes.Structure):
 
 
 class MONITORINFO(ctypes.Structure):
-    _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", wintypes.RECT), ("rcWork", wintypes.RECT),
-                ("dwFlags", wintypes.DWORD)]
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("rcMonitor", wintypes.RECT),
+        ("rcWork", wintypes.RECT),
+        ("dwFlags", wintypes.DWORD),
+    ]
 
 
 def input_idle_seconds():
+    if IS_MAC:
+        from smellyfish.system import mac
+
+        return mac.idle_seconds()
     if not IS_WIN:
         return 0.0
     info = LASTINPUTINFO()
@@ -54,6 +64,10 @@ def window_pid(hwnd):
 
 def fullscreen_app(own_pid):
     """True when the foreground window covers its whole monitor (game, video, presentation)."""
+    if IS_MAC:
+        from smellyfish.system import mac
+
+        return mac.fullscreen_app()
     if not IS_WIN:
         return False
     u = ctypes.windll.user32
@@ -93,11 +107,51 @@ def spotify_playing():
 
 
 def screen_locked():
+    if IS_MAC:
+        from smellyfish.system import mac
+
+        return mac.screen_locked()
     return any((p.info["name"] or "").lower() == "logonui.exe" for p in psutil.process_iter(["name"]))
 
 
+def internet_connected():
+    """What the OS itself knows about the connection (Windows: Network List Manager, macOS: the routing table);
+    sends nothing. True when unsure."""
+    if IS_MAC:
+        from smellyfish.system import mac
+
+        return mac.has_route()
+    if sys.platform != "win32":
+        return True
+    ole32 = ctypes.windll.ole32
+    guid = ctypes.c_byte * 16
+    clsid, iid = guid(), guid()
+    ole32.CLSIDFromString("{DCB00C01-570F-4A9B-8D69-199FDBA5723B}", clsid)
+    ole32.CLSIDFromString("{DCB00000-570F-4A9B-8D69-199FDBA5723B}", iid)
+    init = ole32.CoInitializeEx(None, 0)
+    try:
+        nlm = ctypes.c_void_p()
+        if ole32.CoCreateInstance(clsid, None, 1 | 4, iid, ctypes.byref(nlm)) != 0 or not nlm:
+            return True
+        vtable = ctypes.cast(ctypes.cast(nlm, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+        method = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(ctypes.c_short))
+        release = ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)
+        try:
+            flag = ctypes.c_short(0)
+            if method(vtable[11])(nlm, ctypes.byref(flag)) != 0:
+                return True
+            return bool(flag.value)
+        finally:
+            release(vtable[2])(nlm)
+    except Exception:
+        return True
+    finally:
+        if init in (0, 1):
+            ole32.CoUninitialize()
+
+
 class PcMonitor(QObject):
-    event = Signal(str)          # "user_back", "plugged", "online_again", "locked", "unlocked"
+    event = Signal(str)  # "user_back", "plugged", "online_again", "locked", "unlocked"
 
     def __init__(self):
         super().__init__()
@@ -168,14 +222,7 @@ class PcMonitor(QObject):
 
     def check_net(self):
         def probe():
-            ok = False
-            for host in (("1.1.1.1", 53), ("8.8.8.8", 53)):
-                try:
-                    socket.create_connection(host, timeout=2).close()
-                    ok = True
-                    break
-                except OSError:
-                    pass
+            ok = internet_connected()
             self._fails = 0 if ok else self._fails + 1
             was = self.online
             self.online = ok or self._fails < 2

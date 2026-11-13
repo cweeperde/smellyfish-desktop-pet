@@ -1,4 +1,5 @@
 """Usage limits of Claude Code (via the optional status line relay) and Codex (session files)."""
+
 import glob
 import json
 import os
@@ -63,7 +64,7 @@ def _find(obj, key):
 
 
 class UsageWatch(QObject):
-    warn = Signal(str, str, float, object, bool)    # source, window label, percent, resets_at, critical
+    warn = Signal(str, str, float, object, bool)  # source, window label, percent, resets_at, critical
 
     def __init__(self, cfg):
         super().__init__()

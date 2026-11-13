@@ -1,4 +1,5 @@
 """About window: who made Smellyfish, where to find it and who helped."""
+
 import json
 import os
 import threading
@@ -6,11 +7,18 @@ import urllib.parse
 import urllib.request
 
 from PIL import Image
-
 from PySide6.QtCore import QObject, QRectF, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QImage, QPainter, QPainterPath, QPen, QPixmap, QColor
-from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QScrollArea, QVBoxLayout,
-                               QWidget)
+from PySide6.QtGui import QColor, QDesktopServices, QImage, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPlainTextEdit,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from smellyfish import REPO, __version__
 from smellyfish.art import sprite
@@ -33,8 +41,10 @@ class _Loader(QObject):
 def fetch_people():
     """Contributors with profile pictures: one request to api.github.com and one per picture to
     avatars.githubusercontent.com. Nothing is written to disk."""
-    req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/contributors?per_page=50",
-                                 headers={"User-Agent": "Smellyfish desktop pet", "Accept": "application/vnd.github+json"})
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{REPO}/contributors?per_page=50",
+        headers={"User-Agent": "Smellyfish desktop pet", "Accept": "application/vnd.github+json"},
+    )
     with urllib.request.urlopen(req, timeout=10) as r:
         data = json.loads(r.read(500_000))
     people = []
@@ -48,8 +58,9 @@ def fetch_people():
         if parts.scheme == "https" and parts.hostname == AVATAR_HOST:
             try:
                 sized = url + ("&" if "?" in url else "?") + "s=104"
-                with urllib.request.urlopen(urllib.request.Request(sized, headers={"User-Agent": "Smellyfish desktop pet"}),
-                                            timeout=10) as r:
+                with urllib.request.urlopen(
+                    urllib.request.Request(sized, headers={"User-Agent": "Smellyfish desktop pet"}), timeout=10
+                ) as r:
                     pic = r.read(1_000_000)
             except OSError:
                 pic = None
@@ -112,17 +123,22 @@ class PersonCard(QFrame):
         col.setSpacing(1)
         name = QLabel(person["login"])
         name.setStyleSheet(f"color: {theme.HEAD}; font-size: 14px; font-weight: bold;")
-        sub = QLabel("Creator" if person["login"].lower() == OWNER.lower() else
-                     f"{person['commits']} commit{'s' if person['commits'] != 1 else ''}")
+        sub = QLabel(
+            "Creator"
+            if person["login"].lower() == OWNER.lower()
+            else f"{person['commits']} commit{'s' if person['commits'] != 1 else ''}"
+        )
         sub.setObjectName("hint")
         col.addStretch(1)
         col.addWidget(name)
         col.addWidget(sub)
         col.addStretch(1)
         row.addLayout(col, 1)
-        self.setStyleSheet(f"QFrame#person {{ background: {theme.PANEL}; border: 3px solid {theme.DEEP}; "
-                           f"border-top-color: {theme.LAV}; border-left-color: {theme.LAV}; }}"
-                           f"QFrame#person:hover {{ background: {theme.SEC_HOVER}; }}")
+        self.setStyleSheet(
+            f"QFrame#person {{ background: {theme.PANEL}; border: 3px solid {theme.DEEP}; "
+            f"border-top-color: {theme.LAV}; border-left-color: {theme.LAV}; }}"
+            f"QFrame#person:hover {{ background: {theme.SEC_HOVER}; }}"
+        )
 
     def mousePressEvent(self, e):
         if e.button() == Qt.LeftButton:
@@ -159,6 +175,14 @@ class LicenseWindow(QWidget):
 
 
 class AboutWindow(QWidget):
+    @staticmethod
+    def _upd_busy(b, on, idle):
+        try:
+            b.setEnabled(not on)
+            b.setText("Checking..." if on else idle)
+        except RuntimeError:
+            pass
+
     def __init__(self, app):
         super().__init__(None, Qt.Window)
         self.app = app
@@ -169,15 +193,19 @@ class AboutWindow(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 12)
         root.setSpacing(8)
-        root.addWidget(theme.banner("Smellyfish", f"Version {__version__}",
-                                    sprite.Pose(eyes="happy", blush=True, arm_f=("rest_l", "up_r"))))
+        root.addWidget(
+            theme.banner(
+                "Smellyfish", f"Version {__version__}", sprite.Pose(eyes="happy", blush=True, arm_f=("rest_l", "up_r"))
+            )
+        )
         body = QVBoxLayout()
         body.setContentsMargins(16, 4, 16, 0)
         body.setSpacing(8)
         root.addLayout(body, 1)
 
-        blurb = QLabel("A pixel-art jellyfish that lives on your desktop and shows what your PC and "
-                       "your coding agents are doing.")
+        blurb = QLabel(
+            "A pixel-art jellyfish that lives on your desktop and shows what your PC and your coding agents are doing."
+        )
         blurb.setWordWrap(True)
         body.addWidget(blurb)
 
@@ -193,21 +221,27 @@ class AboutWindow(QWidget):
         self.note.setWordWrap(True)
         body.addWidget(self.note)
 
-        legal = QLabel("Copyright (c) 2026 cweeper. All rights reserved. Pull requests are welcome, see the license "
-                       "for how contributions work. Not affiliated with Anthropic, OpenAI or Discord.")
+        legal = QLabel(
+            "Copyright (c) 2026 cweeper. All rights reserved. Pull requests are welcome, see the license "
+            "for how contributions work. Not affiliated with Anthropic, OpenAI or Discord."
+        )
         legal.setObjectName("hint")
         legal.setWordWrap(True)
         body.addWidget(legal)
 
         row = QHBoxLayout()
         row.setContentsMargins(16, 0, 16, 0)
-        for text, fn in (("GitHub", lambda: QDesktopServices.openUrl(QUrl(PROJECT))),
-                         ("Licenses", self.show_licenses),
-                         ("Updates", lambda: app.updater.check(manual=True))):
+        for text, fn in (
+            ("GitHub", lambda: QDesktopServices.openUrl(QUrl(PROJECT))),
+            ("Licenses", self.show_licenses),
+            ("Updates", lambda: app.updater.check(manual=True)),
+        ):
             b = QPushButton(text)
             b.setObjectName("secondary")
             b.clicked.connect(fn)
             row.addWidget(b)
+            if text == "Updates":
+                app.updater.busy.connect(lambda on, b=b: self._upd_busy(b, on, "Updates"))
         row.addStretch(1)
         close = QPushButton("Close")
         close.clicked.connect(self.close)
@@ -252,9 +286,11 @@ class AboutWindow(QWidget):
             return
         _cache["people"] = people
         self.people = people or [{"login": OWNER, "commits": 0, "pic": None}]
-        self.note.setText("Opening this window asks GitHub for the contributor list (api.github.com) and the "
-                          "profile pictures (avatars.githubusercontent.com). GitHub sees your IP address like on any "
-                          "website. Nothing else is sent and nothing is saved.")
+        self.note.setText(
+            "Opening this window asks GitHub for the contributor list (api.github.com) and the "
+            "profile pictures (avatars.githubusercontent.com). GitHub sees your IP address like on any "
+            "website. Nothing else is sent and nothing is saved."
+        )
         self.rebuild()
 
     def rebuild(self):

@@ -1,4 +1,5 @@
 """A personal to-do list (persisted in the settings) with optional due times."""
+
 import time
 import uuid
 
@@ -12,11 +13,15 @@ class Todos:
 
     @staticmethod
     def _clean(t):
-        return {"id": str(t.get("id") or uuid.uuid4().hex[:8]), "text": str(t["text"])[:MAX_TEXT],
-                "done": bool(t.get("done")), "created": float(t.get("created") or time.time()),
-                "due": float(t["due"]) if t.get("due") else None,
-                "done_at": float(t["done_at"]) if t.get("done_at") else None,
-                "notified": bool(t.get("notified"))}
+        return {
+            "id": str(t.get("id") or uuid.uuid4().hex[:8]),
+            "text": str(t["text"])[:MAX_TEXT],
+            "done": bool(t.get("done")),
+            "created": float(t.get("created") or time.time()),
+            "due": float(t["due"]) if t.get("due") else None,
+            "done_at": float(t["done_at"]) if t.get("done_at") else None,
+            "notified": bool(t.get("notified")),
+        }
 
     def save(self):
         self.cfg.set("todos", list(self.items))

@@ -1,17 +1,18 @@
 """A small pomodoro timer: focus phase, then a break, then ask whether to continue."""
+
 import time
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
 
 class FocusTimer(QObject):
-    phase_end = Signal(str)          # "focus" or "break"
+    phase_end = Signal(str)  # "focus" or "break"
     changed = Signal()
 
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-        self.phase = None             # None, "focus", "break"
+        self.phase = None  # None, "focus", "break"
         self.ends_at = 0.0
         self.timer = QTimer(self, timeout=self._tick)
 

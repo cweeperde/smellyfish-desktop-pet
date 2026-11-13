@@ -1,26 +1,105 @@
 """Animation tester, missed-bubbles history and the Discord setup guide."""
+
 import time
 
-from PIL import Image
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QGuiApplication, QPixmap
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-                               QPushButton, QSlider, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QSlider,
+    QVBoxLayout,
+    QWidget,
+)
 
 from smellyfish.art import sprite
 from smellyfish.ui import theme
 
 CATEGORIES = [
-    ("Claude & Codex", ["thinking", "ponder", "working", "working_b", "question", "done", "done_b", "error",
-                        "exhausted", "warn"]),
-    ("Tools", ["search", "search_b", "terminal", "browse", "todo", "cooking"]),
-    ("Moods", ["happy", "sad", "angry", "shy", "startle", "dizzy", "hello", "bye", "yawn", "tickled", "tickled_b",
-               "petted", "petted_b"]),
-    ("Idle", ["idle", "float", "breathe", "look_around", "bubbles", "read", "sneeze", "sleeping", "stretch", "yoyo",
-              "juggle", "coffee", "gaming", "paper_plane", "bubblegum", "doodle"]),
-    ("Weather", ["sunny", "cloudy", "rainy", "snowy", "shiver"]),
-    ("PC & apps", ["hot", "battery_low", "charging", "zap", "offline", "music", "music_bop", "call", "call_muted",
-                   "call_deaf", "mail", "focus"]),
+    (
+        "Claude & Codex",
+        [
+            "thinking",
+            "ponder",
+            "working",
+            "working_b",
+            "question",
+            "done",
+            "done_b",
+            "error",
+            "exhausted",
+            "warn",
+            "compact",
+        ],
+    ),
+    ("Tools", ["search", "search_b", "terminal", "terminal_b", "browse", "browse_b", "todo", "cooking"]),
+    (
+        "Moods",
+        [
+            "happy",
+            "sad",
+            "angry",
+            "shy",
+            "startle",
+            "dizzy",
+            "hello",
+            "bye",
+            "yawn",
+            "tickled",
+            "tickled_b",
+            "petted",
+            "petted_b",
+        ],
+    ),
+    (
+        "Idle",
+        [
+            "idle",
+            "float",
+            "breathe",
+            "look_around",
+            "bubbles",
+            "read",
+            "sneeze",
+            "sleeping",
+            "stretch",
+            "yoyo",
+            "juggle",
+            "coffee",
+            "gaming",
+            "paper_plane",
+            "bubblegum",
+            "doodle",
+            "fishing",
+            "fishing_boot",
+            "skateboard",
+            "stargaze",
+        ],
+    ),
+    ("Weather", ["sunny", "cloudy", "rainy", "stormy", "foggy", "windy", "snowy", "shiver"]),
+    (
+        "PC & apps",
+        [
+            "hot",
+            "battery_low",
+            "charging",
+            "zap",
+            "offline",
+            "music",
+            "music_bop",
+            "call",
+            "call_muted",
+            "call_deaf",
+            "mail",
+            "focus",
+        ],
+    ),
     ("Calendar & reminders", ["calendar", "reminder", "alarm", "checkoff"]),
     ("Home & moving", ["water", "hop_prep", "rise", "sink", "land", "fall", "swim", "climb", "held", "peek", "tug"]),
     ("Toys & fun", ["snack", "nom", "camera", "trophy", "carry", "trash_full", "sweep"]),
@@ -31,6 +110,7 @@ BG = (34, 36, 48)
 
 def styled(widget, app):
     from smellyfish.ui import theme
+
     theme.apply(widget, app)
 
 
@@ -72,8 +152,9 @@ class GalleryWindow(QWidget):
                 it = QListWidgetItem("   " + n.replace("_", " "))
                 it.setData(Qt.UserRole, n)
                 self.list.addItem(it)
-        self.list.currentItemChanged.connect(lambda cur, _p: cur and cur.data(Qt.UserRole) and self.load(
-            cur.data(Qt.UserRole)))
+        self.list.currentItemChanged.connect(
+            lambda cur, _p: cur and cur.data(Qt.UserRole) and self.load(cur.data(Qt.UserRole))
+        )
         root.addWidget(self.list)
 
         right = QVBoxLayout()
@@ -141,6 +222,7 @@ class GalleryWindow(QWidget):
         img = sprite.render(pose, SCALE, BG)
         data = img.tobytes()
         from PySide6.QtGui import QImage
+
         q = QImage(data, img.width, img.height, img.width * 3, QImage.Format_RGB888).copy()
         self.view.setPixmap(QPixmap.fromImage(q))
         self.info.setText(f"{self.current}   frame {self.idx + 1}/{len(self.frames)}   {ms} ms")
@@ -254,9 +336,11 @@ class DiscordSetup(QWidget):
         portal.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://discord.com/developers/applications")))
         root.addWidget(portal)
         self.fields = {}
-        for key, label, secret in (("discord_client_id", "Client ID", False),
-                                   ("discord_client_secret", "Client Secret", True),
-                                   ("discord_redirect", "Redirect URI", False)):
+        for key, label, secret in (
+            ("discord_client_id", "Client ID", False),
+            ("discord_client_secret", "Client Secret", True),
+            ("discord_redirect", "Redirect URI", False),
+        ):
             row = QHBoxLayout()
             lab = QLabel(label)
             lab.setMinimumWidth(100)
@@ -314,6 +398,7 @@ class AchievementsWindow(QWidget):
 
     def refresh(self):
         from smellyfish.features.life import ACHIEVEMENTS
+
         life = self.app.life
         self.summary.setText(f"Unlocked: {life.unlocked_count()}/{len(ACHIEVEMENTS)}")
         self.list.clear()

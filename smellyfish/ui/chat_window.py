@@ -1,4 +1,5 @@
 """A small window to talk to the local model."""
+
 import re
 
 from PIL import Image, ImageDraw
@@ -71,7 +72,7 @@ class ChatWindow(QWidget):
         busy = bool(self.app.llm_phase)
         loaded = self.app.llm.loaded and not busy
         n, on = 24, 3
-        off = tuple(int(theme.SEC[i:i + 2], 16) for i in (1, 3, 5))
+        off = tuple(int(theme.SEC[i : i + 2], 16) for i in (1, 3, 5))
         img = Image.new("RGBA", (n * 4, 6), (0, 0, 0, 0))
         d = ImageDraw.Draw(img)
         for i in range(n):
@@ -109,6 +110,7 @@ class ChatWindow(QWidget):
                 else:
                     out.append(part.replace("\n", "<br>"))
             return "".join(out)
+
         html = []
         for who, text in self.app.chat_log:
             if who == "help":

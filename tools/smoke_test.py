@@ -1,10 +1,11 @@
-"""Release check: python tools/smoke_test.py [--exe dist/Smellyfish.exe]
+"""Release check: python tools/smoke_test.py [--exe dist/Smellyfish.exe | dist/Smellyfish.app]
 
 1. imports every module and renders every animation frame,
 2. checks that settings saves merge and that the updater refuses unverified downloads,
 3. with --exe: starts the packaged app in a throwaway profile and sends it a hook event.
 Exits non-zero on the first failure.
 """
+
 import argparse
 import hashlib
 import io
@@ -33,12 +34,15 @@ def check_sources():
     step("import all modules")
     import importlib
     import pkgutil
+
     import smellyfish
+
     for mod in pkgutil.walk_packages(smellyfish.__path__, "smellyfish."):
         if mod.name != "smellyfish.__main__":
             importlib.import_module(mod.name)
     step("render every animation frame")
     from smellyfish.art import sprite
+
     for name, anim in sprite.build_all().items():
         for pose, ms in sprite.full(anim):
             assert ms > 0, name
@@ -48,6 +52,7 @@ def check_sources():
 def check_settings():
     step("settings keep changes from two instances")
     from smellyfish import settings
+
     a, b = settings.Settings(), settings.Settings()
     a.set("volume", 11)
     b.set("notify_volume", 22)
@@ -67,6 +72,7 @@ class _Resp(io.BytesIO):
 def check_updater():
     step("updater installs only downloads with a matching sha256 digest")
     from PySide6.QtCore import QCoreApplication, QObject
+
     QCoreApplication.instance() or QCoreApplication([])
     from smellyfish import updater
 
@@ -75,7 +81,7 @@ def check_updater():
         exe = os.path.join(d, "Smellyfish.exe")
         with open(exe, "wb") as f:
             f.write(b"old")
-        asset = {"name": "Smellyfish.exe", "url": "https://x/asset", "size": len(payload)}
+        asset = {"name": updater.ASSET, "url": "https://x/asset", "size": len(payload)}
         if digest:
             asset["digest"] = digest
         rel = {"tag_name": "v999.0.0", "assets": [asset]}
@@ -83,8 +89,21 @@ def check_updater():
         QObject.__init__(u)
         u.cfg, u.installed, u._busy = {}, None, True
         fake = lambda url, accept=None: _Resp(json.dumps(rel).encode() if url == updater.API else payload)
-        with mock.patch.object(updater, "_get", fake), mock.patch.object(sys, "executable", exe):
-            u._run(manual=False)
+        if sys.platform == "darwin":
+            # the bundle swap needs a real disk image; here only the download check matters
+            def install(new):
+                with open(new, "rb") as src, open(exe, "wb") as dst:
+                    dst.write(src.read())
+
+            with (
+                mock.patch.object(updater, "_get", fake),
+                mock.patch.object(updater, "download_path", lambda: exe + ".new"),
+                mock.patch.object(updater, "install", install),
+            ):
+                u._run(manual=False)
+        else:
+            with mock.patch.object(updater, "_get", fake), mock.patch.object(sys, "executable", exe):
+                u._run(manual=False)
         with open(exe, "rb") as f:
             return f.read()
 
@@ -93,18 +112,24 @@ def check_updater():
     assert attempt(b"new", "sha256:" + hashlib.sha256(b"new").hexdigest()) == b"new", "refused a good update"
 
 
-def check_exe(exe):
+def check_exe(exe, prefix=()):
     step(f"start {exe}")
     port = "47977"
     env = dict(os.environ, SMELLYFISH_HOME=HOME, SMELLYFISH_PORT=port, SMELLYFISH_DEBUG="1")
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     def post(path, payload):
-        req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=json.dumps(payload).encode(),
-                                     headers={"Content-Type": "application/json"}, method="POST")
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}{path}",
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
         return json.loads(opener.open(req, timeout=5).read())
 
-    app = subprocess.Popen([os.path.abspath(exe)], env=env)
+    if exe.endswith(".app"):
+        exe = os.path.join(exe, "Contents", "MacOS", "Smellyfish")
+    app = subprocess.Popen([*prefix, os.path.abspath(exe)], env=env)
     try:
         for _ in range(240):
             try:
@@ -115,9 +140,9 @@ def check_exe(exe):
         else:
             raise AssertionError("the app did not start")
         step("hook relay reaches the app")
-        relay = os.path.join(HOME, "relay", "smellyfish-relay.exe")
+        relay = os.path.join(HOME, "relay", "smellyfish-relay" + (".exe" if sys.platform == "win32" else ""))
         event = {"hook_event_name": "UserPromptSubmit", "session_id": "smoke", "prompt": "hi"}
-        r = subprocess.run([relay], input=json.dumps(event).encode(), env=env, capture_output=True, timeout=30)
+        r = subprocess.run([*prefix, relay], input=json.dumps(event).encode(), env=env, capture_output=True, timeout=30)
         assert r.returncode == 0, r
         for _ in range(40):
             if post("/debug/state", {}).get("base") == "thinking":
@@ -126,19 +151,24 @@ def check_exe(exe):
         else:
             raise AssertionError("the hook event did not reach the app")
     finally:
-        subprocess.run(["taskkill", "/F", "/T", "/PID", str(app.pid)], capture_output=True)
+        if sys.platform == "win32":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(app.pid)], capture_output=True)
+        else:
+            app.kill()
+            app.wait(10)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe")
+    ap.add_argument("--arch", help="macOS: run the app as this architecture (x86_64 runs under Rosetta)")
     args = ap.parse_args()
     try:
         check_sources()
         check_settings()
         check_updater()
         if args.exe:
-            check_exe(args.exe)
+            check_exe(args.exe, ["arch", f"-{args.arch}"] if args.arch else ())
     finally:
         shutil.rmtree(HOME, ignore_errors=True)
     print("smoke test passed")

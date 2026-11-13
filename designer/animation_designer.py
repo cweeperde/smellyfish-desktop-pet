@@ -2,6 +2,7 @@
 
 Run from the project root:  python designer/animation_designer.py
 """
+
 import copy
 import json
 import os
@@ -14,10 +15,32 @@ if ROOT not in sys.path:
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPen, QPixmap, QShortcut
-from PySide6.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QComboBox, QFileDialog, QFormLayout,
-                               QGridLayout, QGroupBox, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
-                               QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
-                               QScrollArea, QSpinBox, QSplitter, QTabBar, QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QApplication,
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QSplitter,
+    QTabBar,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from smellyfish.art import sprite
 from smellyfish.art.sprite import BX, CH, CW, PAL, Pose, layers
@@ -62,8 +85,11 @@ class Frame:
         return Frame(self.fields, self.overlay, self.ms)
 
     def to_dict(self):
-        return {"fields": {k: list(v) if isinstance(v, tuple) else v for k, v in self.fields.items()},
-                "overlay": [[x, y, c] for (x, y), c in sorted(self.overlay.items())], "ms": self.ms}
+        return {
+            "fields": {k: list(v) if isinstance(v, tuple) else v for k, v in self.fields.items()},
+            "overlay": [[x, y, c] for (x, y), c in sorted(self.overlay.items())],
+            "ms": self.ms,
+        }
 
     @staticmethod
     def from_dict(d):
@@ -250,6 +276,7 @@ class PoseForm(QWidget):
                     values.append(v)
                     w.addItem(str(v))
                 w.setCurrentIndex(values.index(v))
+
             self.io[key] = (get, put)
             row(label, w)
 
@@ -276,6 +303,7 @@ class PoseForm(QWidget):
                         for o in ws:
                             o.addItem(x)
                     w.setCurrentIndex(values.index(x))
+
             self.io[key] = (lambda: tuple(w.currentText() for w in ws), put)
             form.addRow(label, box)
 
@@ -301,6 +329,7 @@ class PoseForm(QWidget):
         def tp_put(v):
             for w, x in zip(self.tp, v):
                 w.setCurrentIndex(TPS.index(x) if x in TPS else 0)
+
         self.io["tp"] = (lambda: tuple(w.currentText() for w in self.tp), tp_put)
         form.addRow("Tentacle shapes", tpbox)
         check("typing", "Typing (side)")
@@ -310,6 +339,7 @@ class PoseForm(QWidget):
 
         def down_get():
             return tuple(int(t) for t in re.findall(r"-?\d+", self.down.text()))
+
         self.io["down"] = (down_get, lambda v: self.down.setText(",".join(str(i) for i in v)))
         row("Keys down", self.down)
         self.lap = QComboBox()
@@ -330,6 +360,7 @@ class PoseForm(QWidget):
             self.lap.setCurrentIndex(0 if not v else LAPTOPS.index(v[0]))
             self.lx.setValue(v[1] if v else sprite.LAP_X)
             self.ly.setValue(v[2] if v else sprite.LAP_Y)
+
         self.io["laptop"] = (lap_get, lap_put)
         form.addRow("Laptop", lb)
         check("blush", "Blush")
@@ -475,8 +506,14 @@ class Designer(QMainWindow):
         self.build_toolbar()
         self.status = QLabel()
         self.statusBar().addWidget(self.status)
-        for key, fn in (("Ctrl+Z", self.do_undo), ("Ctrl+Y", self.do_redo), ("Ctrl+Shift+Z", self.do_redo),
-                        ("Ctrl+S", self.save), ("Ctrl+D", self.dup_frame), ("Space", self.toggle_play)):
+        for key, fn in (
+            ("Ctrl+Z", self.do_undo),
+            ("Ctrl+Y", self.do_redo),
+            ("Ctrl+Shift+Z", self.do_redo),
+            ("Ctrl+S", self.save),
+            ("Ctrl+D", self.dup_frame),
+            ("Space", self.toggle_play),
+        ):
             QShortcut(QKeySequence(key), self, activated=fn)
         self.refresh_all()
         self.resize(1360, 840)
@@ -504,9 +541,15 @@ class Designer(QMainWindow):
         self.list.currentRowChanged.connect(self.select_row)
         lv.addWidget(self.list, 1)
         grid = QGridLayout()
-        for i, (label, fn) in enumerate((("Add", self.add_frame), ("Duplicate", self.dup_frame),
-                                         ("Delete", self.del_frame), ("Up", lambda: self.move_frame(-1)),
-                                         ("Down", lambda: self.move_frame(1)))):
+        for i, (label, fn) in enumerate(
+            (
+                ("Add", self.add_frame),
+                ("Duplicate", self.dup_frame),
+                ("Delete", self.del_frame),
+                ("Up", lambda: self.move_frame(-1)),
+                ("Down", lambda: self.move_frame(1)),
+            )
+        ):
             b = QPushButton(label)
             b.clicked.connect(fn)
             grid.addWidget(b, i // 3, i % 3)
@@ -614,10 +657,17 @@ class Designer(QMainWindow):
     def build_toolbar(self):
         tb = self.addToolBar("Main")
         tb.setMovable(False)
-        for label, fn in (("New", self.new_project), ("Open", self.open_project), ("Save", self.save),
-                          ("Save as", self.save_as), ("Import built-in", self.import_builtin),
-                          ("Export code", self.export_file), ("Copy code", self.copy_code),
-                          ("Undo", self.do_undo), ("Redo", self.do_redo)):
+        for label, fn in (
+            ("New", self.new_project),
+            ("Open", self.open_project),
+            ("Save", self.save),
+            ("Save as", self.save_as),
+            ("Import built-in", self.import_builtin),
+            ("Export code", self.export_file),
+            ("Copy code", self.copy_code),
+            ("Undo", self.do_undo),
+            ("Redo", self.do_redo),
+        ):
             tb.addAction(label, fn)
 
     # ---- state helpers
@@ -804,8 +854,7 @@ class Designer(QMainWindow):
         if not fr or not fr.overlay:
             return
         self.push_undo()
-        fr.overlay = {(x + dx, y + dy): c for (x, y), c in fr.overlay.items()
-                      if 0 <= x + dx < CW and 0 <= y + dy < CH}
+        fr.overlay = {(x + dx, y + dy): c for (x, y), c in fr.overlay.items() if 0 <= x + dx < CW and 0 <= y + dy < CH}
         self.pixels_changed()
 
     def clear_pixels(self):
@@ -828,8 +877,7 @@ class Designer(QMainWindow):
         if frame is None:
             self.view.clear()
             return
-        self.view.setPixmap(frame_pixmap(frame, self.zoom.value(), BG[self.bg.currentText()],
-                                         palette_for(self.skin)))
+        self.view.setPixmap(frame_pixmap(frame, self.zoom.value(), BG[self.bg.currentText()], palette_for(self.skin)))
 
     def _sequence(self, outro_only=False):
         s = self.project.segments
@@ -890,8 +938,11 @@ class Designer(QMainWindow):
         self.refresh_all()
 
     def default_dir(self):
-        return SAVE_DIR if os.path.isdir(SAVE_DIR) else (os.path.join(ROOT, "dev") if os.path.isdir(
-            os.path.join(ROOT, "dev")) else ROOT)
+        return (
+            SAVE_DIR
+            if os.path.isdir(SAVE_DIR)
+            else (os.path.join(ROOT, "dev") if os.path.isdir(os.path.join(ROOT, "dev")) else ROOT)
+        )
 
     def open_project(self):
         if not self.confirm_discard():
@@ -929,9 +980,12 @@ class Designer(QMainWindow):
     def save_as(self):
         if os.path.isdir(os.path.join(ROOT, "dev")):
             os.makedirs(SAVE_DIR, exist_ok=True)
-        path, _ = QFileDialog.getSaveFileName(self, "Save project",
-                                              os.path.join(self.default_dir(), ident(self.project.name) + ".json"),
-                                              "Designer project (*.json)")
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save project",
+            os.path.join(self.default_dir(), ident(self.project.name) + ".json"),
+            "Designer project (*.json)",
+        )
         if path:
             self.path = path
             self.save()
@@ -943,8 +997,9 @@ class Designer(QMainWindow):
             return
         self.stop()
         self.project = Project.from_animation(name, sprite.ANIMATIONS[name]())
-        self.seg = "loop" if self.project.segments["loop"] else next(
-            (s for s in SEGMENTS if self.project.segments[s]), "loop")
+        self.seg = (
+            "loop" if self.project.segments["loop"] else next((s for s in SEGMENTS if self.project.segments[s]), "loop")
+        )
         self.idx = 0 if self.frames() else -1
         self.path, self.dirty = None, False
         self.undo.clear()
@@ -960,17 +1015,18 @@ class Designer(QMainWindow):
             QMessageBox.information(self, "Export", "There are no frames yet.")
             return False
         if any(f.out_of_canvas() for s in SEGMENTS for f in self.project.segments[s]):
-            r = QMessageBox.question(self, "Export", "Some frames have pixels outside the canvas, which the "
-                                     "game cannot draw. Export anyway?")
+            r = QMessageBox.question(
+                self, "Export", "Some frames have pixels outside the canvas, which the game cannot draw. Export anyway?"
+            )
             return r == QMessageBox.Yes
         return True
 
     def export_file(self):
         if not self.check_export():
             return
-        path, _ = QFileDialog.getSaveFileName(self, "Export code",
-                                              os.path.join(self.default_dir(), ident(self.project.name) + ".py"),
-                                              "Python (*.py)")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export code", os.path.join(self.default_dir(), ident(self.project.name) + ".py"), "Python (*.py)"
+        )
         if not path:
             return
         try:

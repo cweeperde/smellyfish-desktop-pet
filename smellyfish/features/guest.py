@@ -1,4 +1,5 @@
 """A friend's jellyfish steps out of a door, maybe hands over a letter and goes back in."""
+
 import math
 import random
 
@@ -45,10 +46,10 @@ class Sprite(QWidget):
     """A frameless transparent window that shows one pixel image (and optionally a name above it)."""
 
     def __init__(self, app):
-        super().__init__(None, Qt.FramelessWindowHint | Qt.Tool | Qt.WindowDoesNotAcceptFocus
-                         | Qt.WindowStaysOnTopHint)
+        super().__init__(None, Qt.FramelessWindowHint | Qt.Tool | Qt.WindowDoesNotAcceptFocus | Qt.WindowStaysOnTopHint)
         self.app = app
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_MacAlwaysShowToolWindow)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
         self.image = None
@@ -58,7 +59,8 @@ class Sprite(QWidget):
         self.font = QFont("Cascadia Mono", 9, QFont.Bold)
 
     def set_pil(self, pil, label=None):
-        from smellyfish.app import to_qimage
+        from smellyfish.ui.views import to_qimage
+
         pix = self.app.pix
         dpr = self.devicePixelRatioF() or 1.0
         dev = max(1, round(pix * dpr))
@@ -98,7 +100,7 @@ class Sprite(QWidget):
 
 def skin_pal(color):
     c = color.lstrip("#")
-    return sprite.skin_from_color(tuple(int(c[i:i + 2], 16) for i in (0, 2, 4)))
+    return sprite.skin_from_color(tuple(int(c[i : i + 2], 16) for i in (0, 2, 4)))
 
 
 def dressed(pose, look):
@@ -139,6 +141,7 @@ class Visit:
         pix = self.app.pix
         hx, hy = self.ground()
         from PySide6.QtCore import QPoint
+
         screen = QGuiApplication.screenAt(QPoint(round(hx), round(hy) - 4)) or QGuiApplication.primaryScreen()
         self.screen = screen.availableGeometry()
         right = hx + (house_mod.LEFT + house_mod.WIDTH + 3) * pix
@@ -169,8 +172,9 @@ class Visit:
         body = sprite.render(pose.but(parts=list(pose.parts) + list(parts)), 1, pal=self.pal)
         self.body.set_pil(body, self.name)
         _hx, hy = self.ground()
-        self.body.move(round(self.cx - CENTER_X * pix - self.body.ox),
-                       round(hy - sprite.FEET * pix - self.body.top + self.lift))
+        self.body.move(
+            round(self.cx - CENTER_X * pix - self.body.ox), round(hy - sprite.FEET * pix - self.body.top + self.lift)
+        )
         self.body.show()
         self.body.raise_()
 
@@ -266,9 +270,11 @@ class Visit:
         yield from self.swing(False)
         self.door_dx = 0
         self.draw_door(0.0)
-        for pose in (sprite.Pose(eyes="happy", arm_f=("rest_l", "up_r")),
-                     sprite.Pose(eyes="happy", arm_f=("rest_l", "wave_r")),
-                     sprite.Pose(eyes="happy", arm_f=("rest_l", "up_r"))):
+        for pose in (
+            sprite.Pose(eyes="happy", arm_f=("rest_l", "up_r")),
+            sprite.Pose(eyes="happy", arm_f=("rest_l", "wave_r")),
+            sprite.Pose(eyes="happy", arm_f=("rest_l", "up_r")),
+        ):
             yield self.stand(pose, 260)
         if self.letter:
             for lift in (0, 1, 2):
@@ -282,8 +288,12 @@ class Visit:
         stay = random.randint(*STAY_MS)
         waited = 0
         while waited < stay:
-            for pose, ms in ((sprite.Pose(eyes="happy"), 700), (sprite.Pose(eyes="blink"), 140),
-                             (sprite.Pose(eyes="happy", ex=1), 600), (sprite.Pose(eyes="happy", ex=-1), 600)):
+            for pose, ms in (
+                (sprite.Pose(eyes="happy"), 700),
+                (sprite.Pose(eyes="blink"), 140),
+                (sprite.Pose(eyes="happy", ex=1), 600),
+                (sprite.Pose(eyes="happy", ex=-1), 600),
+            ):
                 waited += ms
                 yield self.stand(pose, ms)
         yield self.stand(sprite.Pose(eyes="happy", arm_f=("rest_l", "wave_r")), 500)

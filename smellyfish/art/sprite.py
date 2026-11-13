@@ -348,6 +348,9 @@ SKINS = {
     "blue": {"#": (120, 170, 240), "L": (185, 215, 255), "D": (70, 110, 190)},
     "mint": {"#": (120, 215, 175), "L": (195, 250, 222), "D": (60, 155, 125)},
     "peach": {"#": (250, 170, 120), "L": (255, 218, 185), "D": (205, 118, 78)},
+    "night": {"#": (96, 94, 156), "L": (140, 140, 204), "D": (60, 58, 108)},
+    "lemon": {"#": (245, 215, 100), "L": (255, 240, 170), "D": (200, 160, 60)},
+    "snow": {"#": (220, 225, 240), "L": (246, 248, 255), "D": (156, 165, 200)},
 }
 
 
@@ -850,10 +853,11 @@ def music():
     loop = []
     for t in range(8):
         notes = [(NOTE if (t // 2) % 2 == 0 else NOTE2, BX + 17 + t % 2, BY - 3 - t % 3)]
-        arms = ("up_l", "rest_r") if t % 4 < 2 else ("rest_l", "up_r")
-        loop.append((Pose(eyes="happy" if t % 4 else "open", dy=-(t % 2),
-                          tent=("left", "straight", "right", "straight")[t % 4], arm_f=arms, parts=notes), 220))
-    return {"intro": [(Pose(), 200)], "loop": loop, "outro": [(Pose(), 150)]}
+        arms = ("rest_l", "up_r") if 3 <= t < 7 else ("up_l", "rest_r")
+        loop.append((Pose(eyes="happy", dy=-(t % 2), tent=("left", "straight", "right", "straight")[t // 2],
+                          arm_f=arms, parts=notes), 220))
+    ready = Pose(eyes="happy", arm_f=("up_l", "rest_r"))
+    return {"intro": [(Pose(), 200), (ready, 120)], "loop": loop, "outro": [(ready, 100), (Pose(), 150)]}
 
 
 # ---------------------------------------------------------------- idle fidgets
@@ -1031,12 +1035,54 @@ OUTFITS = {
         "..PPP......PPP..",
         "...P........P...",
     ],
+    "bunny": [
+        "...WW......WW...",
+        "..WpW......WpW..",
+        "..WpW......WpW..",
+        "..WpW......WpW..",
+        "..WWW......WWW..",
+    ],
+    "straw": [
+        ".....yyyyyy.....",
+        "....yyyyyyyy....",
+        "....RRRRRRRR....",
+        ".oyyyyyyyyyyyyo.",
+    ],
+    "pumpkin": [
+        ".......vv.......",
+        ".....aaaaaa.....",
+        "...aaeaaaaeaa...",
+        "..aaaaaaaaaaaa..",
+        "..aaaeaeeaeaaa..",
+    ],
 }
 
 
-def outfit_for(month, day):
+def easter(year):
+    """Easter Sunday (Gregorian calendar) as (month, day)."""
+    a, b, c = year % 19, year // 100, year % 100
+    d, e = b // 4, b % 4
+    g = (8 * b + 13) // 25
+    h = (19 * a + b - d - g + 15) % 30
+    j, k = c // 4, c % 4
+    m = (a + 11 * h) // 319
+    r = (2 * e + 2 * j - k - h + m + 32) % 7
+    month = (h - m + r + 90) // 25
+    return month, (h - m + r + month + 19) % 32
+
+
+def outfit_for(month, day, year=None):
     if month == 12 and 1 <= day <= 26:
         return "santa"
+    if year:
+        import datetime
+        sunday = datetime.date(year, *easter(year))
+        if -2 <= (datetime.date(year, month, day) - sunday).days <= 1:
+            return "bunny"
+    if month == 10 and day == 31:
+        return "pumpkin"
+    if month == 6 and 21 <= day <= 30:
+        return "straw"
     if (month == 12 and day == 31) or (month == 1 and day == 1):
         return "party"
     if month == 10 and day >= 24:
@@ -1197,7 +1243,6 @@ SCARF = [
     ".ZZZZZZZZZZZZZZ.",
     "............XWZ.",
     "............XXZ.",
-    "............XWZ.",
     "............Z.Z.",
 ]
 SCARF_SIDE = [
@@ -1206,7 +1251,6 @@ SCARF_SIDE = [
     ".ZZZZZZZZZZZZ.",
     "XWZ...........",
     "XXZ...........",
-    "XWZ...........",
     "Z.Z...........",
 ]
 SHADES = [
@@ -1228,6 +1272,7 @@ WEATHER = {
     "rain": RAIN,
     "cold": [(SCARF, 0, 6)],
     "snow": [(SCARF, 0, 6), (["W.....W....W", "...W.....W..", ".W.....W...."], 2, -7)],
+    "storm": RAIN,
 }
 
 
@@ -1260,6 +1305,7 @@ WEATHER_INV = dict(WEATHER, cold=[(SCARF_INV, 0, 2)], snow=[(SCARF_INV, 0, 2), W
 WEATHER_SIDE = {
     "sun": [(SHADES_SIDE, 0, 3)],
     "rain": WEATHER["rain"],
+    "storm": WEATHER["rain"],
     "cold": [(SCARF_SIDE, 0, 6)],
     "snow": [(SCARF_SIDE, 0, 6), WEATHER["snow"][1]],
 }
@@ -1428,10 +1474,12 @@ GIGGLE = [".Y.", "YWY", ".Y."]
 
 def tickled():
     intro = []
+    up = ("up_l", "up_r")
+    intro.append((Pose(eyes="happy", blush=True, arm_f=up), 90))
     for t in range(12):
-        intro.append((Pose(eyes="happy", blush=True, dy=-(t % 2), tent=("left", "right")[t % 2],
-                           arm_f=("up_l", "up_r") if t % 4 < 2 else ("rest_l", "rest_r"),
+        intro.append((Pose(eyes="happy", blush=True, dy=-(t % 2), tent=("left", "right")[t % 2], arm_f=up,
                            parts=[(GIGGLE, BX + (18 if t % 2 else -3), BY - 2 + t % 3)]), 90))
+    intro.append((Pose(eyes="happy", blush=True, arm_f=up), 120))
     intro.append((Pose(eyes="happy", blush=True), 250))
     return {"intro": intro, "loop": []}
 
@@ -1827,8 +1875,8 @@ def working_b():
     loop = []
     for t in range(16):
         typing = t % 8 < 6
-        loop.append((Pose(ey=1, ex=(0, 0, 0, 0, 0, 0, -1, 1)[t % 8], tent="tuck" if typing and t % 2 else "spread",
-                          dy=-(t % 2) if typing else 0, eyes="blink" if t == 11 else "open",
+        loop.append((Pose(ey=1, ex=-1 if t == 7 else 0, tent="tuck" if typing and t % 2 else "spread",
+                          dy=-(t % 2) if typing else 0, eyes="blink" if t == 15 else "open",
                           parts=lap(-(t % 2) if typing else 0)), 110 if typing else 260))
     outro = [(Pose(ey=1, eyes="happy", parts=lap()), 200), (Pose(eyes="happy", parts=[(LAP_BACK, BX + 2, BY + 11)]), 100),
              (Pose(), 160)]
@@ -1868,6 +1916,201 @@ def land():
                       (Pose(dy=-1, tent="long"), 70), (Pose(), 120)], "loop": []}
 
 
+# ---------------------------------------------------------------- compacting, more tool poses
+PAPER_STACK = ["WWWWWWW", "wwwwwww", "WWWWWWW", "wwwwwww", "WWWWWWW", "wwwwwww", "WWWWWWW", "wwwwwww"]
+PAPER_BRICK = ["kkkkkkk", "WWWWWWW", "GGGGGGG"]
+
+
+def compact():
+    """The agent compresses its context: a tall pile of notes is pressed into one small brick."""
+    x, floor = BX + 17, FEET - 1
+    pile = lambda rows: [(PAPER_STACK[:rows], x, floor - rows + 1)]
+    brick = [(PAPER_BRICK, x, floor - 2)]
+    press = ("rest_l", "up_r")
+    intro = [(Pose(ex=1, parts=pile(8)), 260),
+             (Pose(ex=1, ey=1, arm_f=press, parts=pile(8)), 220),
+             (Pose(ex=1, ey=1, eyes="sleep", arm_f=press, parts=pile(6)), 180),
+             (Pose(ex=1, ey=1, eyes="sleep", arm_f=press, squash=True, parts=pile(4)), 180),
+             (Pose(ex=1, ey=1, eyes="sleep", squash=True, parts=pile(3)), 180),
+             (Pose(ex=1, ey=1, eyes="sleep", parts=brick), 220),
+             (Pose(ex=1, ey=1, eyes="happy", parts=brick + [(SPARKLE, x + 5, floor - 6)]), 320),
+             (Pose(ex=1, ey=1, eyes="happy", parts=brick + [(SPARKLE, x + 1, floor - 7)]), 320),
+             (Pose(eyes="happy", parts=brick), 260)]
+    return {"intro": intro, "loop": [], "outro": [(Pose(), 160)]}
+
+
+def _log_window(t):
+    rows = ["gggggggggggg"] + ["gnnnnnnnnnng"] * 5 + ["gggggggggggg"]
+    rows = [list(r) for r in rows]
+    lengths = (6, 3, 8, 5, 7, 2, 4, 8)
+    for line in range(5):
+        k = t // 2 + line
+        if line == 4 and t % 2 == 0:
+            rows[1 + line][2] = "W"
+            continue
+        for i in range(lengths[k % len(lengths)]):
+            rows[1 + line][2 + i] = "c" if k % 3 == 0 else "w"
+    return ["".join(r) for r in rows]
+
+
+def terminal_b():
+    """Second pose for 'terminal': watches a log scroll by in a window above its head."""
+    win = lambda t: [(_log_window(t), BX + 2, BY - 9)]
+    loop = []
+    for t in range(12):
+        loop.append((Pose(ey=-1, eyes="blink" if t == 9 else "open",
+                          arm_f=("rest_l", "up_r") if t % 4 < 2 else ("rest_l", "rest_r"), parts=win(t)), 170))
+    return {"intro": [(Pose(ey=-1, parts=win(0)), 200)], "loop": loop, "outro": [(Pose(), 120)]}
+
+
+def _page(t):
+    rows = ["ggggggggggg", "gRgYgcggggg", "gWWWWWWWWWg", "gWWWWWWWWWg", "gWWWWWWWWWg", "gWWWWWWWWWg", "gWWWWWWWWWg",
+            "gWWWWWWWWWg", "ggggggggggg"]
+    rows = [list(r) for r in rows]
+    content = ("SSSSSSS", "", "wwwwwww", "wwwww", "", "BBB", "wwwwwww", "wwww", "", "SSSSS", "wwwwww", "www")
+    for line in range(6):
+        text = content[(t + line) % len(content)]
+        for i, ch in enumerate(text):
+            rows[2 + line][2 + i] = ch
+    return ["".join(r) for r in rows]
+
+
+def browse_b():
+    """Second pose for 'browse': scrolls through a web page in a little browser window."""
+    win = lambda t: [(_page(t), BX + 17, BY - 2)]
+    loop = []
+    for t in range(12):
+        loop.append((Pose(ex=1, ey=(0, 0, 1, 1)[t % 4], eyes="blink" if t == 7 else "open",
+                          arm_f=("rest_l", "up_r"), parts=win(t)), 200))
+    return {"intro": [(Pose(ex=1, parts=win(0)), 160)], "loop": loop, "outro": [(Pose(), 120)]}
+
+
+# ---------------------------------------------------------------- more idle actions
+ROD = ["....q", "...q.", "..q..", ".q...", "q...."]
+BOOT = ["qq..", "qq..", "qqqq", "bbbb"]
+
+
+def fishing(catch=None):
+    """Casts a line over the edge, waits, and pulls up a fish (or, now and then, an old boot)."""
+    catch = catch or FISH
+    lucky = catch is FISH
+    hold = ("rest_l", "up_r")
+    rod = (ROD, BX + 17, BY - 2)
+    lx, top = BX + 21, BY - 1
+    line = lambda n, end=("R",): [rod, (["w"] * n, lx, top), (list(end), lx - len(end[0]) // 2, top + n)]
+    deep = CH - top - 2
+    intro = [(Pose(ex=1, arm_f=hold, parts=[rod]), 260)]
+    intro += [(Pose(ex=1, ey=1, arm_f=hold, parts=line(n)), 110) for n in (5, 10, deep)]
+    for t in range(6):
+        intro.append((Pose(ex=1, ey=1, arm_f=hold, eyes="blink" if t == 3 else "open",
+                           parts=line(deep - (t % 2))), 430))
+    intro.append((Pose(ex=1, ey=1, eyes="wide", arm_f=hold, parts=line(deep) + [(BANG, BX + 12, BY - 7)]), 260))
+    intro.append((Pose(ex=1, ey=1, eyes="wide", arm_f=hold, dy=-1, parts=line(10, catch)), 150))
+    intro.append((Pose(ex=1, eyes="wide", arm_f=hold, dy=-1, parts=line(4, catch)), 150))
+    shown = "happy" if lucky else "sleep"
+    intro.append((Pose(ex=1, eyes=shown, blush=lucky, arm_f=hold, parts=line(2, catch)), 420))
+    intro.append((Pose(ex=1, eyes=shown, blush=lucky, arm_f=hold, dy=-1 if lucky else 0, parts=line(2, catch)), 420))
+    return {"intro": intro, "loop": [], "outro": [(Pose(eyes=shown), 220)]}
+
+
+BOARD = [".TTTTTTTTTTTT.", "..G........G.."]
+
+
+def skateboard():
+    """Rolls a little way along the edge on a skateboard and back again."""
+    board = lambda dx: [(BOARD, BX + 1 + dx, FEET - 2)]
+    out = ("up_l", "up_r")
+    intro = [(Pose(ey=1, parts=board(0)), 240),
+             (Pose(ey=1, dy=-4, tent="long", parts=board(0)), 120),
+             (Pose(dy=-2, tent="spread", parts=board(0)), 160),
+             (Pose(dy=-2, tent="spread", arm_f=out, eyes="happy", parts=board(0)), 200)]
+    for dx in (2, 4, 6):
+        intro.append((Pose(dy=-2, dx=dx, tent="left", arm_f=out, eyes="happy", parts=board(dx)), 130))
+    intro.append((Pose(dy=-2, dx=6, tent="spread", arm_f=out, eyes="happy", parts=board(6)), 320))
+    for dx in (4, 2, 0):
+        intro.append((Pose(dy=-2, dx=dx, tent="right", arm_f=out, eyes="happy", parts=board(dx)), 130))
+    intro.append((Pose(dy=-2, tent="spread", arm_f=out, eyes="happy", blush=True, parts=board(0)), 360))
+    intro.append((Pose(dy=-2, tent="spread", eyes="happy", blush=True, parts=board(0)), 200))
+    return {"intro": intro, "loop": [], "outro": [(Pose(eyes="happy"), 200)]}
+
+
+TELESCOPE = [".....hH", "....hH.", "...hH..", "..hH...", ".kH....", "..q....", ".q.q...", "q...q.."]
+TRAIL = ["y...", ".y..", "..Y.", "...W"]
+
+
+def stargaze():
+    """Late in the evening: looks through a telescope while a shooting star crosses the sky."""
+    scope = (TELESCOPE, BX + 17, BY + 4)
+    sky = [(BX + 1, BY - 9), (BX + 8, BY - 11), (BX + 25, BY - 6), (BX + 14, BY - 8)]
+    stars = lambda t: [(["W" if (t + k) % 3 else "w"], x, y) for k, (x, y) in enumerate(sky)]
+    hold = ("rest_l", "up_r")
+    intro = [(Pose(ex=1, parts=[scope]), 260), (Pose(ex=1, ey=-1, arm_f=hold, parts=[scope] + stars(0)), 300)]
+    for t in range(1, 7):
+        intro.append((Pose(ex=1, ey=-1, arm_f=hold, eyes="blink" if t == 4 else "open",
+                           parts=[scope] + stars(t)), 340))
+    for k in range(4):
+        intro.append((Pose(ex=(-1, 0, 1, 1)[k], ey=-1, eyes="wide", arm_f=hold,
+                           parts=[scope] + stars(7 + k) + [(TRAIL, BX - 2 + k * 6, BY - 11 + k * 2)]), 120))
+    intro.append((Pose(ex=1, ey=-1, eyes="happy", arm_f=hold, parts=[scope] + stars(11)), 420))
+    intro.append((Pose(ex=1, ey=-1, eyes="happy", blush=True, arm_f=hold, parts=[scope] + stars(12)), 480))
+    return {"intro": intro, "loop": [], "outro": [(Pose(eyes="happy"), 200)]}
+
+
+# ---------------------------------------------------------------- more weather
+STORM_CLOUD = ["..GGGGGG....", ".GGGGGGGGGG.", "GGGGGGGGGGGG", ".GGGGGGGGGG."]
+LIGHTNING = [".YY", "YY.", "YYY", ".YY", "YY."]
+
+
+def stormy():
+    """Thunderstorm: a dark cloud, rain, and a flash that makes it jump."""
+    intro = []
+    for t in range(12):
+        flash = t in (4, 9)
+        drops = [(["S"], BX + x, BY - 3 + (t * 2 + k * 3) % 11) for k, x in enumerate((-2, 18, 21))]
+        parts = [(STORM_CLOUD, BX + 14, BY - 9)] + drops
+        if flash:
+            parts.append((LIGHTNING, BX + 19, BY - 5))
+        p = Pose(ey=-1, ex=1, eyes="wide" if flash or t in (5, 10) else "open", dy=-1 if flash else 0, parts=parts)
+        intro.append((with_weather(p, "rain"), 170 if not flash else 110))
+    return {"intro": intro, "loop": []}
+
+
+FOG = ["wwwwwww..www", "..wwwwwwww.."]
+
+
+def drifting(rows, x, y):
+    """A prop that may hang over the left or right edge of the canvas: only the visible columns are kept."""
+    lo, hi = max(0, -x), max(0, min(len(rows[0]), CW - x))
+    return ([r[lo:hi] for r in rows] if hi > lo else ["."], max(0, min(x, CW - 1)), y)
+
+
+def foggy():
+    """Fog: grey banks drift past while it peers around."""
+    intro = []
+    for t in range(12):
+        banks = [drifting(FOG, t * 2 - 6, BY - 5), drifting(FOG[::-1], 26 - t * 2, BY + 9),
+                 drifting(FOG, t * 2 + 8, BY + 2)]
+        intro.append((Pose(ex=(-1, -1, -1, 0, 1, 1, 1, 0)[t % 8], eyes="sleep" if t in (5, 6) else "open",
+                           parts=banks), 240))
+    return {"intro": intro, "loop": []}
+
+
+LEAF = [".v", "vv", "v."]
+
+
+def windy():
+    """Wind: gusts streak past, a leaf flies by and it leans against it."""
+    intro = [(Pose(ex=1), 160)]
+    for t in range(12):
+        gust = [drifting(["wwww"], 30 - (t * 5 + k * 9) % 36, BY - 4 + k * 6) for k in range(3)]
+        leaf = [drifting(LEAF, 30 - t * 3, BY - 6 + (t % 3))]
+        hard = 3 <= t < 9
+        intro.append((Pose(ex=1, eyes="sleep" if hard else "open", dx=-1 if hard else 0,
+                           tent="left" if t >= 1 else "straight", parts=gust + leaf), 150))
+    intro.append((Pose(eyes="blink"), 160))
+    return {"intro": intro, "loop": []}
+
+
 ANIMATIONS = {"ponder": ponder, "idle": idle, "working": working, "thinking": thinking, "question": question, "done": done,
               "sleeping": sleeping, "error": error, "happy": happy, "sad": sad,
               "held": held, "fall": fall, "land": land,
@@ -1884,13 +2127,18 @@ ANIMATIONS = {"ponder": ponder, "idle": idle, "working": working, "thinking": th
               "petted": petted, "trash_full": trash_full, "sweep": sweep, "warn": warn,
               "cooking": cooking, "yoyo": yoyo, "juggle": juggle, "coffee": coffee, "gaming": gaming,
               "paper_plane": paper_plane, "bubblegum": bubblegum, "doodle": doodle,
+              "compact": compact, "terminal_b": terminal_b, "browse_b": browse_b, "fishing": fishing,
+              "fishing_boot": lambda: fishing(BOOT), "skateboard": skateboard,
+              "stargaze": stargaze, "stormy": stormy, "foggy": foggy, "windy": windy,
               "float": float_idle, "tug": tug, "breathe": breathe, "hop_prep": hop_prep, "rise": rise, "sink": sink,
               "startle": startle, "tickled_b": tickled_b, "petted_b": petted_b, "done_b": done_b,
               "music_bop": music_bop, "calendar": calendar_page, "working_b": working_b, "search_b": search_b}
 
 # alternatives the player picks from when it starts one of these, so the same thing does not always look the same
 VARIANTS = {"done": ["done", "done_b"], "tickled": ["tickled", "tickled_b"], "petted": ["petted", "petted_b"],
-            "working": ["working", "working_b"], "search": ["search", "search_b"], "music": ["music", "music_bop"]}
+            "working": ["working", "working_b"], "search": ["search", "search_b"], "music": ["music", "music_bop"],
+            "terminal": ["terminal", "terminal_b"], "browse": ["browse", "browse_b"],
+            "fishing": ["fishing", "fishing", "fishing", "fishing_boot"]}
 
 
 # how much slower the short reactions play so they can be seen without staring at the pet

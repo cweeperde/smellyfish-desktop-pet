@@ -4,6 +4,7 @@ Works with Spotify, browsers, VLC and every other player that reports to Windows
 The winrt calls are async, so they run in a worker thread with its own event loop; state goes back to the Qt
 thread through on_state.
 """
+
 import asyncio
 import logging
 import queue
@@ -16,6 +17,7 @@ log = logging.getLogger("smellyfish.media")
 try:
     from winrt.windows.media.control import GlobalSystemMediaTransportControlsSessionManager as Manager
     from winrt.windows.storage.streams import Buffer, InputStreamOptions
+
     AVAILABLE = True
 except Exception:
     Manager = None
@@ -23,10 +25,27 @@ except Exception:
 
 PLAYING, PAUSED = 4, 5
 POLL_S = 1.5
-KNOWN = {"spotify": "Spotify", "chrome": "Chrome", "msedge": "Edge", "firefox": "Firefox", "opera": "Opera",
-         "brave": "Brave", "vivaldi": "Vivaldi", "vlc": "VLC", "zunemusic": "Media Player", "foobar2000": "foobar2000",
-         "musicbee": "MusicBee", "aimp": "AIMP", "tidal": "TIDAL", "deezer": "Deezer", "applemusic": "Apple Music",
-         "itunes": "iTunes", "youtube": "YouTube Music", "winamp": "Winamp", "plexamp": "Plexamp"}
+KNOWN = {
+    "spotify": "Spotify",
+    "chrome": "Chrome",
+    "msedge": "Edge",
+    "firefox": "Firefox",
+    "opera": "Opera",
+    "brave": "Brave",
+    "vivaldi": "Vivaldi",
+    "vlc": "VLC",
+    "zunemusic": "Media Player",
+    "foobar2000": "foobar2000",
+    "musicbee": "MusicBee",
+    "aimp": "AIMP",
+    "tidal": "TIDAL",
+    "deezer": "Deezer",
+    "applemusic": "Apple Music",
+    "itunes": "iTunes",
+    "youtube": "YouTube Music",
+    "winamp": "Winamp",
+    "plexamp": "Plexamp",
+}
 
 
 def app_name(aumid):
@@ -154,14 +173,21 @@ class MediaWatch:
                 pos += max(0.0, now - tl.last_updated_time.timestamp())
             pos = max(0.0, min(pos, dur) if dur > 0 else pos)
         controls = info.controls
-        return {"app_id": session.source_app_user_model_id, "app": app_name(session.source_app_user_model_id),
-                "title": props.title or "", "artist": props.artist or props.album_artist or "",
-                "album": props.album_title or "", "status": int(info.playback_status),
-                "pos": pos, "dur": max(0.0, dur), "at": now,
-                "can_seek": bool(controls and controls.is_playback_position_enabled) and dur > 0,
-                "can_next": bool(controls and controls.is_next_enabled),
-                "can_prev": bool(controls and controls.is_previous_enabled),
-                "_thumb": props.thumbnail}
+        return {
+            "app_id": session.source_app_user_model_id,
+            "app": app_name(session.source_app_user_model_id),
+            "title": props.title or "",
+            "artist": props.artist or props.album_artist or "",
+            "album": props.album_title or "",
+            "status": int(info.playback_status),
+            "pos": pos,
+            "dur": max(0.0, dur),
+            "at": now,
+            "can_seek": bool(controls and controls.is_playback_position_enabled) and dur > 0,
+            "can_next": bool(controls and controls.is_next_enabled),
+            "can_prev": bool(controls and controls.is_previous_enabled),
+            "_thumb": props.thumbnail,
+        }
 
     @staticmethod
     async def _cover(ref):
@@ -173,6 +199,6 @@ class MediaWatch:
             size = min(int(stream.size), 2 * 1024 * 1024)
             buf = Buffer(size)
             await stream.read_async(buf, size, InputStreamOptions.READ_AHEAD)
-            return bytes(memoryview(buf))[:buf.length]
+            return bytes(memoryview(buf))[: buf.length]
         except Exception:
             return None

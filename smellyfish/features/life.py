@@ -1,13 +1,6 @@
 """Statistics and achievements (persisted in the settings)."""
+
 import time
-
-DAY_START_H = 4
-
-
-def click_day(now=None):
-    """The click counter's day runs from 4:00 to 4:00, so a late night does not reset it at midnight."""
-    t = time.time() if now is None else now
-    return time.strftime("%Y-%m-%d", time.localtime(t - DAY_START_H * 3600))
 
 ACHIEVEMENTS = [
     ("first_task", "First task", "Your AI agent finished a task", "tasks_done", 1),
@@ -33,8 +26,8 @@ ACHIEVEMENTS = [
     ("plant_10", "Green thumb", "Watered the plant 10 times", "watered", 10),
     ("weather_10", "Weather nerd", "Checked the weather 10 times", "weather_checks", 10),
     ("photo_10", "Paparazzi", "Took 10 screenshots", "screenshots", 10),
-    ("trash_1", "Clean desk", "Emptied the recycle bin", "trash_emptied", 1),
-    ("trash_5", "Neat freak", "Emptied the recycle bin 5 times", "trash_emptied", 5),
+    ("trash_1", "Clean desk", "Emptied the trash", "trash_emptied", 1),
+    ("trash_5", "Neat freak", "Emptied the trash 5 times", "trash_emptied", 5),
     ("focus_5", "Deep work", "Finished 5 focus rounds", "focus_rounds", 5),
     ("breaks_10", "Hydrated", "Took 10 breaks when it asked", "breaks", 10),
     ("todo_1", "Ticked off", "Finished your first to-do", "todos_done", 1),
@@ -46,7 +39,7 @@ ACHIEVEMENTS = [
     ("night_owl", "Night owl", "Still at the computer after 2 am", "night_owl", 1),
     ("clicks_1k", "Warming up", "1,000 clicks and key presses", "clicks", 1000),
     ("clicks_100k", "Clicky fingers", "100,000 clicks and key presses", "clicks", 100000),
-    ("clicks_day", "Keyboard warrior", "10,000 clicks and key presses in one day", "best_day_clicks", 10000),
+    ("clicks_1m", "Keyboard warrior", "1,000,000 clicks and key presses", "clicks", 1000000),
 ]
 
 
@@ -55,6 +48,8 @@ class Life:
         self.cfg = cfg
         self.stats = dict(cfg.get("stats") or {})
         self.unlocked = dict(cfg.get("achievements") or {})
+        if "clicks_day" in self.unlocked and "clicks_1m" not in self.unlocked:
+            self.unlocked["clicks_1m"] = self.unlocked["clicks_day"]
         today = time.strftime("%Y-%m-%d")
         if self.stats.get("last_day") != today:
             self.stats["last_day"] = today

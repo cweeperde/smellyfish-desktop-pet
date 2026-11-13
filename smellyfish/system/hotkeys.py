@@ -1,13 +1,31 @@
-"""Global hotkeys via RegisterHotKey (Windows). Hotkey strings look like "Ctrl+Alt+F9"."""
+"""Global hotkeys via RegisterHotKey (Windows) or Carbon (macOS, Win/Meta = Cmd, Alt = Option).
+Hotkey strings look like "Ctrl+Alt+F9"."""
+
 import ctypes
 import sys
 
 WM_HOTKEY = 0x0312
 MODS = {"alt": 0x1, "ctrl": 0x2, "control": 0x2, "shift": 0x4, "win": 0x8, "meta": 0x8}
 MOD_NOREPEAT = 0x4000
-NAMED = {"space": 0x20, "tab": 0x09, "esc": 0x1B, "escape": 0x1B, "home": 0x24, "end": 0x23, "ins": 0x2D,
-         "insert": 0x2D, "del": 0x2E, "delete": 0x2E, "pgup": 0x21, "pgdown": 0x22, "left": 0x25, "up": 0x26,
-         "right": 0x27, "down": 0x28, "pause": 0x13}
+NAMED = {
+    "space": 0x20,
+    "tab": 0x09,
+    "esc": 0x1B,
+    "escape": 0x1B,
+    "home": 0x24,
+    "end": 0x23,
+    "ins": 0x2D,
+    "insert": 0x2D,
+    "del": 0x2E,
+    "delete": 0x2E,
+    "pgup": 0x21,
+    "pgdown": 0x22,
+    "left": 0x25,
+    "up": 0x26,
+    "right": 0x27,
+    "down": 0x28,
+    "pause": 0x13,
+}
 
 ACTIONS = [
     ("toggle", "Hide / show"),
@@ -22,9 +40,19 @@ ACTIONS = [
     ("media", "Play / pause media"),
     ("ask", "Chat with the local model"),
 ]
-DEFAULTS = {"toggle": "Ctrl+Alt+F9", "home": "Ctrl+Alt+F10", "dnd": "Ctrl+Alt+F11", "history": "Ctrl+Alt+F12",
-            "focus": "Ctrl+Alt+F8", "chase": "Ctrl+Alt+F7", "mini": "Ctrl+Alt+F6", "todo": "Ctrl+Alt+F5", "ask": "Ctrl+Alt+F3",
-            "calendar": "Ctrl+Alt+F4", "media": ""}
+DEFAULTS = {
+    "toggle": "Ctrl+Alt+F9",
+    "home": "Ctrl+Alt+F10",
+    "dnd": "Ctrl+Alt+F11",
+    "history": "Ctrl+Alt+F12",
+    "focus": "Ctrl+Alt+F8",
+    "chase": "Ctrl+Alt+F7",
+    "mini": "Ctrl+Alt+F6",
+    "todo": "Ctrl+Alt+F5",
+    "ask": "Ctrl+Alt+F3",
+    "calendar": "Ctrl+Alt+F4",
+    "media": "",
+}
 
 
 def parse(text):
@@ -48,16 +76,25 @@ def parse(text):
 
 
 class Hotkeys:
-    def __init__(self):
+    def __init__(self, on_action=None):
         self.hwnd = None
         self.ids = {}
         self.failed = []
+        self.on_action = on_action
+        self._mac = None
 
     def register(self, hwnd, mapping):
         """mapping: {action: 'Ctrl+Alt+F9'}. Returns actions whose key is taken by another app."""
         self.unregister()
         self.hwnd = hwnd
         self.failed = []
+        if sys.platform == "darwin":
+            from smellyfish.system import mac
+
+            if self._mac is None:
+                self._mac = mac.CarbonHotkeys(lambda action: self.on_action and self.on_action(action))
+            self.failed = self._mac.register(mapping, [a for a, _ in ACTIONS])
+            return self.failed
         if sys.platform != "win32":
             return []
         user32 = ctypes.windll.user32
@@ -72,6 +109,8 @@ class Hotkeys:
         return self.failed
 
     def unregister(self):
+        if self._mac is not None:
+            self._mac.unregister()
         if sys.platform == "win32" and self.hwnd:
             for i in self.ids:
                 ctypes.windll.user32.UnregisterHotKey(self.hwnd, i)
@@ -79,6 +118,7 @@ class Hotkeys:
 
     def action_for(self, message_address):
         from ctypes import wintypes
+
         msg = wintypes.MSG.from_address(int(message_address))
         if msg.message == WM_HOTKEY:
             return self.ids.get(int(msg.wParam))

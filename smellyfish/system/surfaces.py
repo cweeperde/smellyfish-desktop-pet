@@ -1,21 +1,24 @@
-"""Top edges of visible desktop windows the pet can sit on (Windows only).
+"""Top edges of visible desktop windows the pet can sit on.
 
-Rectangles come from Win32 in physical pixels and are converted to Qt's logical
+On Windows, rectangles come from Win32 in physical pixels and are converted to Qt's logical
 coordinates per monitor. An edge counts only where no window above it in z-order
-covers it.
+covers it. On macOS, Quartz reports bounds already in Qt's coordinates.
 
 Desktop icons count as small surfaces too (see icons.py). Only icons with free desktop
 above them qualify, so the pet never covers another icon.
 """
+
 import ctypes
 import sys
-from ctypes import wintypes
 
 from PySide6.QtGui import QGuiApplication
 
 from smellyfish.system import icons as desk_icons
+from smellyfish.system import mac
+from smellyfish.system.wincompat import wintypes
 
 IS_WIN = sys.platform == "win32"
+IS_MAC = sys.platform == "darwin"
 if IS_WIN:
     user32 = ctypes.windll.user32
     dwmapi = ctypes.windll.dwmapi
@@ -31,8 +34,13 @@ SKIP_CLASSES = {"Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd",
 
 
 class MONITORINFOEXW(ctypes.Structure):
-    _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", wintypes.RECT), ("rcWork", wintypes.RECT),
-                ("dwFlags", wintypes.DWORD), ("szDevice", wintypes.WCHAR * 32)]
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("rcMonitor", wintypes.RECT),
+        ("rcWork", wintypes.RECT),
+        ("dwFlags", wintypes.DWORD),
+        ("szDevice", wintypes.WCHAR * 32),
+    ]
 
 
 class Surface:
@@ -54,8 +62,9 @@ class Surface:
         return True
 
     def visible_at(self, x):
-        return self.x0 <= x <= self.x1 and not any(c[0] <= x <= c[2] and c[1] <= self.y + 1 <= c[3]
-                                                    for c in self.covers)
+        return self.x0 <= x <= self.x1 and not any(
+            c[0] <= x <= c[2] and c[1] <= self.y + 1 <= c[3] for c in self.covers
+        )
 
     def visible_span(self, xa, xb, step=4):
         """The whole stretch [xa, xb] of the top edge is on the window and not covered by another one."""
@@ -86,12 +95,15 @@ def _to_logical(r):
     mi.cbSize = ctypes.sizeof(mi)
     user32.GetMonitorInfoW(mon, ctypes.byref(mi))
     ox, oy = mi.rcMonitor.left, mi.rcMonitor.top
-    screen = min(QGuiApplication.screens(),
-                 key=lambda s: abs(s.geometry().x() - ox) + abs(s.geometry().y() - oy))
+    screen = min(QGuiApplication.screens(), key=lambda s: abs(s.geometry().x() - ox) + abs(s.geometry().y() - oy))
     dpr = screen.devicePixelRatio()
     g = screen.geometry()
-    return (g.x() + (r.left - ox) / dpr, g.y() + (r.top - oy) / dpr,
-            g.x() + (r.right - ox) / dpr, g.y() + (r.bottom - oy) / dpr)
+    return (
+        g.x() + (r.left - ox) / dpr,
+        g.y() + (r.top - oy) / dpr,
+        g.x() + (r.right - ox) / dpr,
+        g.y() + (r.bottom - oy) / dpr,
+    )
 
 
 def _class(hwnd):
@@ -108,6 +120,8 @@ def _cloaked(hwnd):
 
 def window_rects(exclude=()):
     """Visible top-level windows in z-order (front first) as (hwnd, logical rect)."""
+    if IS_MAC:
+        return _mac_rects()
     if not IS_WIN:
         return []
     out = []
@@ -160,8 +174,16 @@ def window_top(hwnd):
     if isinstance(hwnd, tuple):
         found = _find_icon(hwnd)
         return (found[0][0], found[0][2], found[1][1]) if found else None
-    if not IS_WIN or not user32.IsWindow(hwnd) or not user32.IsWindowVisible(hwnd) or user32.IsIconic(hwnd) \
-            or _cloaked(hwnd):
+    if IS_MAC:
+        r = mac.window_rect(hwnd)
+        return (r[0], r[2], r[1]) if r else None
+    if (
+        not IS_WIN
+        or not user32.IsWindow(hwnd)
+        or not user32.IsWindowVisible(hwnd)
+        or user32.IsIconic(hwnd)
+        or _cloaked(hwnd)
+    ):
         return None
     x0, y0, x1, _ = _to_logical(_rect(hwnd))
     return x0, x1, y0
@@ -169,7 +191,17 @@ def window_top(hwnd):
 
 def window_bottom(hwnd):
     """Current logical (x0, x1, bottom y) of a window, or None if it is gone or hidden."""
-    if not IS_WIN or isinstance(hwnd, tuple) or not user32.IsWindow(hwnd) or not user32.IsWindowVisible(hwnd)             or user32.IsIconic(hwnd) or _cloaked(hwnd):
+    if IS_MAC and not isinstance(hwnd, tuple):
+        r = mac.window_rect(hwnd)
+        return (r[0], r[2], r[3]) if r else None
+    if (
+        not IS_WIN
+        or isinstance(hwnd, tuple)
+        or not user32.IsWindow(hwnd)
+        or not user32.IsWindowVisible(hwnd)
+        or user32.IsIconic(hwnd)
+        or _cloaked(hwnd)
+    ):
         return None
     x0, _y0, x1, y1 = _to_logical(_rect(hwnd))
     return x0, x1, y1
@@ -177,11 +209,25 @@ def window_bottom(hwnd):
 
 def _qpoint(x, y):
     from PySide6.QtCore import QPoint
+
     return QPoint(round(x), round(y))
 
 
 def _icons():
+    if IS_MAC:
+        return mac.desktop_icons()
     return desk_icons.desktop_icons(lambda r: _to_logical(r))
+
+
+def _mac_rects():
+    out = []
+    for wid, pid, box in mac.window_list():
+        if pid == mac.OWN_PID or box[2] - box[0] < 120 or box[3] - box[1] < 60:
+            continue
+        if any(all(abs(box[i] - o[1][i]) < 2 for i in range(4)) for o in out):
+            continue
+        out.append((wid, box))
+    return out
 
 
 def _find_icon(key):

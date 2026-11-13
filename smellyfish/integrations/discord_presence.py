@@ -3,6 +3,7 @@
 Talks only to the local Discord client through its IPC pipe. Nothing is sent from
 this program to the network, and only short generic status lines are shared.
 """
+
 import os
 import threading
 import time

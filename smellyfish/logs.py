@@ -1,4 +1,5 @@
 r"""Writes warnings and errors (including uncaught exceptions) to %APPDATA%\Smellyfish\smellyfish.log."""
+
 import logging
 import logging.handlers
 import os
@@ -25,5 +26,6 @@ def setup():
             sys.__excepthook__(kind, value, tb)
 
     sys.excepthook = hook
-    threading.excepthook = lambda a: log.error("uncaught exception in thread %s", a.thread,
-                                               exc_info=(a.exc_type, a.exc_value, a.exc_traceback))
+    threading.excepthook = lambda a: log.error(
+        "uncaught exception in thread %s", a.thread, exc_info=(a.exc_type, a.exc_value, a.exc_traceback)
+    )

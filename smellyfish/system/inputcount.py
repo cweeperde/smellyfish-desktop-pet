@@ -1,9 +1,12 @@
-"""Counts mouse clicks and key presses (Windows Raw Input). Only the number of presses is kept:
+"""Counts mouse clicks and key presses (Windows Raw Input, macOS listen-only event tap). Only the number of
+presses is kept:
 no keys, no text and no positions are recorded."""
+
 import ctypes
 import struct
 import sys
-from ctypes import wintypes
+
+from smellyfish.system.wincompat import wintypes
 
 WM_INPUT = 0x00FF
 RID_INPUT = 0x10000003
@@ -16,8 +19,12 @@ RI_KEY_BREAK = 0x1
 
 
 class RAWINPUTDEVICE(ctypes.Structure):
-    _fields_ = [("usUsagePage", wintypes.USHORT), ("usUsage", wintypes.USHORT), ("dwFlags", wintypes.DWORD),
-                ("hwndTarget", wintypes.HWND)]
+    _fields_ = [
+        ("usUsagePage", wintypes.USHORT),
+        ("usUsage", wintypes.USHORT),
+        ("dwFlags", wintypes.DWORD),
+        ("hwndTarget", wintypes.HWND),
+    ]
 
 
 class InputCounter:
@@ -26,18 +33,28 @@ class InputCounter:
         self.hwnd = None
         self.held = set()
         self._buf = ctypes.create_string_buffer(256)
+        self._tap = None
 
     def start(self, hwnd):
+        if sys.platform == "darwin":
+            from smellyfish.system import mac
+
+            if self._tap is None:
+                self._tap = mac.InputTap(self.on_press)
+            return self._tap.start()
         if sys.platform != "win32" or self.hwnd:
             return False
-        devs = (RAWINPUTDEVICE * 2)(RAWINPUTDEVICE(1, 2, RIDEV_INPUTSINK, hwnd),
-                                    RAWINPUTDEVICE(1, 6, RIDEV_INPUTSINK, hwnd))
+        devs = (RAWINPUTDEVICE * 2)(
+            RAWINPUTDEVICE(1, 2, RIDEV_INPUTSINK, hwnd), RAWINPUTDEVICE(1, 6, RIDEV_INPUTSINK, hwnd)
+        )
         if ctypes.windll.user32.RegisterRawInputDevices(devs, 2, ctypes.sizeof(RAWINPUTDEVICE)):
             self.hwnd = hwnd
             return True
         return False
 
     def stop(self):
+        if self._tap is not None:
+            self._tap.stop()
         if not self.hwnd:
             return
         devs = (RAWINPUTDEVICE * 2)(RAWINPUTDEVICE(1, 2, RIDEV_REMOVE, None), RAWINPUTDEVICE(1, 6, RIDEV_REMOVE, None))

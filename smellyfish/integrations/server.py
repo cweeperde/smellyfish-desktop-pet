@@ -4,20 +4,25 @@ Most events are answered immediately with {}. Events the pet can answer with a b
 (PermissionRequest, single-select AskUserQuestion) wait until the user clicks or the
 wait expires; every failure path answers {} so Claude Code falls back to the terminal.
 """
+
 import itertools
-import logging
 import json
+import logging
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs
 
 from PySide6.QtCore import QObject, Signal
+
+from smellyfish.integrations import agents
 
 log = logging.getLogger("smellyfish.hooks")
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("SMELLYFISH_PORT", "47811"))
 WAIT_S = float(os.environ.get("SMELLYFISH_WAIT", "570"))
+MAX_BODY = 8 * 1024 * 1024
 
 
 def is_answerable(payload):
@@ -39,11 +44,12 @@ class Pending:
 
 
 class HookServer(QObject):
-    event = Signal(object)          # payload dict, non-blocking
-    ask = Signal(object)            # Pending, needs an answer
-    expired = Signal(str)           # rid whose wait ran out
+    event = Signal(object)  # payload dict, non-blocking
+    ask = Signal(object)  # Pending, needs an answer
+    expired = Signal(str)  # rid whose wait ran out
     debug_cmd = Signal(object)
-    status = Signal(object)         # Claude Code status line JSON
+    status = Signal(object)  # Claude Code status line JSON
+    shell = Signal(object)  # right-click request from Explorer: {"action", "path"}
 
     def __init__(self, policy=None):
         super().__init__()
@@ -72,9 +78,17 @@ class HookServer(QObject):
             def do_GET(self):
                 self._reply({"ok": True, "app": "smellyfish"} if self.path == "/health" else {}, 200)
 
+            def _local(self):
+                """Only our own helpers talk to this server: no browser page (Origin) and no rebound host name."""
+                host = (self.headers.get("Host") or "").rsplit(":", 1)[0].lower()
+                return self.headers.get("Origin") is None and host in ("127.0.0.1", "localhost")
+
             def do_POST(self):
                 try:
                     n = int(self.headers.get("Content-Length") or 0)
+                    if n > MAX_BODY or not self._local():
+                        self.close_connection = True
+                        return self._reply({}, 403)
                     payload = json.loads(self.rfile.read(n) or b"{}")
                 except Exception:
                     return self._reply({})
@@ -85,9 +99,23 @@ class HookServer(QObject):
                 if route == "/status" and isinstance(payload, dict):
                     hub.status.emit(payload)
                     return self._reply({})
+                if route == "/shell":
+                    if self.headers.get("X-Smellyfish") != "1" or not isinstance(payload, dict):
+                        return self._reply({})
+                    action, path = str(payload.get("action") or ""), str(payload.get("path") or "")
+                    if (action == "details" or action.startswith("agent:")) and os.path.exists(path):
+                        hub.shell.emit({"action": action, "path": path})
+                    return self._reply({})
                 if route != "/hook" or not isinstance(payload, dict):
                     return self._reply({})
-                payload["_source"] = "codex" if "source=codex" in query else "claude"
+                args = parse_qs(query)
+                source = (args.get("source") or ["claude"])[0]
+                if source not in ("claude", "codex") + agents.AGENTS:
+                    source = "claude"
+                payload = agents.normalize(source, (args.get("event") or [""])[0], payload)
+                if payload is None:
+                    return self._reply({})
+                payload["_source"] = source
                 try:
                     self._reply(hub.handle(payload))
                 except Exception:
@@ -100,8 +128,13 @@ class HookServer(QObject):
     def handle(self, payload):
         answerable = is_answerable(payload)
         allowed = answerable and self.policy(payload)
-        log.info("hook %s %s from %s: %s", payload.get("hook_event_name"), payload.get("tool_name") or "",
-                 payload.get("_source"), "bubble" if allowed else "answerable but off" if answerable else "info")
+        log.info(
+            "hook %s %s from %s: %s",
+            payload.get("hook_event_name"),
+            payload.get("tool_name") or "",
+            payload.get("_source"),
+            "bubble" if allowed else "answerable but off" if answerable else "info",
+        )
         if not allowed:
             self.event.emit(payload)
             return {}
@@ -142,8 +175,9 @@ class HookServer(QObject):
 def ask_answer(payload, answers):
     tool_input = dict(payload.get("tool_input") or {})
     tool_input["answers"] = answers
-    return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow",
-                                   "updatedInput": tool_input}}
+    return {
+        "hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "updatedInput": tool_input}
+    }
 
 
 def permission_answer(payload, choice):

@@ -1,4 +1,5 @@
 """Starts and stops the model server (Ollama or llama.cpp) quietly in the background, only when it is needed."""
+
 import glob
 import os
 import shutil
@@ -17,12 +18,19 @@ def binary_for(backend, configured=""):
     """Path of ollama.exe / llama-server.exe: the configured one, then PATH, then the usual places."""
     if configured and os.path.isfile(configured):
         return configured
+    exe = ".exe" if sys.platform == "win32" else ""
     if backend == "ollama":
-        guesses = [os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Ollama", "ollama.exe")]
+        guesses = [
+            os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Ollama", "ollama.exe"),
+            "/Applications/Ollama.app/Contents/Resources/ollama",
+            "/opt/homebrew/bin/ollama",
+            "/usr/local/bin/ollama",
+        ]
         names = ["ollama"]
     else:
-        guesses = glob.glob(os.path.join(os.path.expanduser("~"), "llama.cpp", "**", "llama-server.exe"),
-                            recursive=True)
+        guesses = glob.glob(
+            os.path.join(os.path.expanduser("~"), "llama.cpp", "**", "llama-server" + exe), recursive=True
+        ) + ["/opt/homebrew/bin/llama-server", "/usr/local/bin/llama-server"]
         names = ["llama-server"]
     for name in names:
         found = shutil.which(name)
@@ -81,8 +89,11 @@ class ServerProcess:
             self.stop()
         exe = binary_for(backend, binary)
         if not exe:
-            return "Could not find " + ("ollama.exe" if backend == "ollama" else "llama-server.exe") + \
-                   " (set its path in the settings)"
+            return (
+                "Could not find "
+                + ("ollama" if backend == "ollama" else "llama-server")
+                + " (set its path in the settings)"
+            )
         port = urlparse(base).port or (11434 if backend == "ollama" else 8080)
         if backend == "ollama":
             cmd = [exe, "serve"]
@@ -94,9 +105,14 @@ class ServerProcess:
             cmd = [exe, "-m", gguf, "--host", "127.0.0.1", "--port", str(port)] + (extra.split() if extra else [])
             env = dict(os.environ)
         try:
-            self.proc = subprocess.Popen(cmd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                         stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW
-                                         if sys.platform == "win32" else 0)
+            self.proc = subprocess.Popen(
+                cmd,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            )
         except OSError as e:
             return f"Could not start the model server ({e.strerror or e})"
         self.model = model

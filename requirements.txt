@@ -2,12 +2,20 @@ Pillow==11.3.0
 PySide6==6.10.0
 psutil==7.1.0
 numpy==2.2.6
-soundcard==0.4.6
+soundcard==0.4.6; sys_platform == "win32"
 pyinstaller==6.22.2
 cryptography==46.0.3
 python-dateutil==2.9.0.post0
-winrt-runtime==4.1.0
-winrt-Windows.Foundation==4!10.0.28000.2957
-winrt-Windows.Foundation.Collections==4!10.0.28000.2957
-winrt-Windows.Media.Control==4!10.0.28000.2957
-winrt-Windows.Storage.Streams==4!10.0.28000.2957
+winrt-runtime==4.1.0; sys_platform == "win32"
+winrt-Windows.Foundation==4!10.0.28000.2957; sys_platform == "win32"
+winrt-Windows.Foundation.Collections==4!10.0.28000.2957; sys_platform == "win32"
+winrt-Windows.Media.Control==4!10.0.28000.2957; sys_platform == "win32"
+winrt-Windows.Storage.Streams==4!10.0.28000.2957; sys_platform == "win32"
+pyobjc-core==11.1; sys_platform == "darwin"
+pyobjc-framework-Cocoa==11.1; sys_platform == "darwin"
+pyobjc-framework-Quartz==11.1; sys_platform == "darwin"
+pyobjc-framework-CoreText==11.1; sys_platform == "darwin"
+pyobjc-framework-ApplicationServices==11.1; sys_platform == "darwin"
+pyobjc-framework-ScreenCaptureKit==11.1; sys_platform == "darwin"
+pyobjc-framework-CoreMedia==11.1; sys_platform == "darwin"
+pyobjc-framework-CoreLocation==11.1; sys_platform == "darwin"

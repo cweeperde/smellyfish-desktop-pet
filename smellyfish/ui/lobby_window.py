@@ -1,12 +1,25 @@
 """LAN lobby window: host or join a lobby, chat, visit and send letters."""
+
 import time
 
 from PIL import Image
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QGuiApplication, QIcon, QImage, QPixmap
-from PySide6.QtWidgets import (QGroupBox, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QMessageBox, QPushButton, QStackedWidget, QTextBrowser, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QGroupBox,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QStackedWidget,
+    QTextBrowser,
+    QVBoxLayout,
+    QWidget,
+)
 
 from smellyfish import __version__
 from smellyfish.art import sprite
@@ -39,8 +52,9 @@ class LobbyWindow(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 12)
         root.setSpacing(8)
-        root.addWidget(theme.banner("Lobby", "Visit friends on your network",
-                                    sprite.Pose(eyes="happy", arm_f=("rest_l", "up_r"))))
+        root.addWidget(
+            theme.banner("Lobby", "Visit friends on your network", sprite.Pose(eyes="happy", arm_f=("rest_l", "up_r")))
+        )
         body = QVBoxLayout()
         body.setContentsMargins(14, 0, 14, 0)
         body.setSpacing(8)
@@ -99,8 +113,10 @@ class LobbyWindow(QWidget):
         create.setObjectName("primary")
         create.clicked.connect(self.create)
         hl.addWidget(create)
-        hint = QLabel("Friends on your network see it and need the password to come in. Everything is encrypted "
-                      "and stays inside your network. As the owner you relay (and can read) the messages.")
+        hint = QLabel(
+            "Friends on your network see it and need the password to come in. Everything is encrypted "
+            "and stays inside your network. As the owner you relay (and can read) the messages."
+        )
         hint.setObjectName("hint")
         hint.setWordWrap(True)
         hl.addWidget(hint)
@@ -126,8 +142,10 @@ class LobbyWindow(QWidget):
         go.clicked.connect(self.join)
         r.addWidget(go)
         jl.addLayout(r)
-        self.empty_hint = QLabel("Nothing shows up? Ask the host for the address (it is shown in their lobby) "
-                                 "and type it above. Both sides need the same Smellyfish version.")
+        self.empty_hint = QLabel(
+            "Nothing shows up? Ask the host for the address (it is shown in their lobby) "
+            "and type it above. Both sides need the same Smellyfish version."
+        )
         self.empty_hint.setObjectName("hint")
         self.empty_hint.setWordWrap(True)
         jl.addWidget(self.empty_hint)
@@ -247,8 +265,7 @@ class LobbyWindow(QWidget):
         return self.app.lan_name()
 
     def create(self):
-        password = self.service.host(self.my_name(), self.app.lan_color(), self.lobby_name.text(),
-                                     self.password.text())
+        password = self.service.host(self.my_name(), self.app.lan_color(), self.lobby_name.text(), self.password.text())
         if password:
             self.password.clear()
 
@@ -262,8 +279,9 @@ class LobbyWindow(QWidget):
         i = self.found.currentRow()
         chosen = self.lobbies[i] if 0 <= i < len(self.lobbies) else None
         if chosen is not None and not chosen.get("ok", True):
-            return self.set_status(f"That lobby runs Smellyfish {chosen['ver']} and you have {__version__}. "
-                                   "Update so both match.")
+            return self.set_status(
+                f"That lobby runs Smellyfish {chosen['ver']} and you have {__version__}. Update so both match."
+            )
         text = self.address.text().strip()
         host, _, port = text.rpartition(":")
         if not host or not port.isdigit():
@@ -307,8 +325,9 @@ class LobbyWindow(QWidget):
         if target is None or self.service.role != "host":
             return
         name = self.selected_name()
-        ask = QMessageBox.question(self, "Remove from lobby", f"Remove {name} from the lobby?",
-                                   QMessageBox.Yes | QMessageBox.No)
+        ask = QMessageBox.question(
+            self, "Remove from lobby", f"Remove {name} from the lobby?", QMessageBox.Yes | QMessageBox.No
+        )
         if ask == QMessageBox.Yes:
             self.service.kick(target)
 
@@ -331,8 +350,10 @@ class LobbyWindow(QWidget):
 
     # ------------------------------------------------------------ updates
     def retint(self):
-        self.lock.setText(f'<span style="color:{theme.GOOD}">Encrypted.</span> Everything is scrambled on its way. '
-                          "The lobby owner's PC passes the messages on, so the owner can read them.")
+        self.lock.setText(
+            f'<span style="color:{theme.GOOD}">Encrypted.</span> Everything is scrambled on its way. '
+            "The lobby owner's PC passes the messages on, so the owner can read them."
+        )
 
     def set_status(self, text):
         self.status.setText(text)
@@ -368,8 +389,9 @@ class LobbyWindow(QWidget):
             if host:
                 port = self.service.server.serverPort() if self.service.server else lan.DEFAULT_PORT
                 where = ", ".join(f"{ip}:{port}" for ip in lan.local_addresses()[:3])
-                self.addr_hint.setText("Friends find the lobby by themselves. If not, they can type: "
-                                       + (where or "your IP address"))
+                self.addr_hint.setText(
+                    "Friends find the lobby by themselves. If not, they can type: " + (where or "your IP address")
+                )
             self.set_status("You are the owner." if host else "You are in.")
             self.entries = []
             self.render_log()
@@ -429,8 +451,13 @@ class LobbyWindow(QWidget):
     def render_log(self):
         def esc(t):
             return t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        self.log.setHtml("".join(
-            f'<p><span style="color:{theme.MUTED}">{t}</span> <b style="color:{theme.HEAD}">{esc(n)}</b> '
-            f'{esc(x)}</p>' for t, n, x in self.entries))
+
+        self.log.setHtml(
+            "".join(
+                f'<p><span style="color:{theme.MUTED}">{t}</span> <b style="color:{theme.HEAD}">{esc(n)}</b> '
+                f"{esc(x)}</p>"
+                for t, n, x in self.entries
+            )
+        )
         bar = self.log.verticalScrollBar()
         bar.setValue(bar.maximum())

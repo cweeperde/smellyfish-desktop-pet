@@ -1,4 +1,5 @@
 """Exports of the to-do list and the reminders as Markdown or CSV."""
+
 import csv
 import io
 import time
@@ -36,8 +37,16 @@ def todos_csv(todos, reminders):
     w = csv.writer(out, delimiter=";", lineterminator="\r\n")
     w.writerow(["Type", "Text", "Status", "Due", "Created", "Finished"])
     for t in todos:
-        w.writerow(["To-do", t["text"], "done" if t["done"] else "open", _when(t.get("due")),
-                    _when(t.get("created")), _when(t.get("done_at"))])
+        w.writerow(
+            [
+                "To-do",
+                t["text"],
+                "done" if t["done"] else "open",
+                _when(t.get("due")),
+                _when(t.get("created")),
+                _when(t.get("done_at")),
+            ]
+        )
     for r in sorted(reminders, key=lambda r: r["due"]):
         w.writerow(["Reminder", r["text"], "pending", _when(r["due"]), "", ""])
     return out.getvalue()

@@ -1,14 +1,23 @@
 """Shared pixel-art look for all windows: bevelled panels, chunky buttons and pixel headers.
 
 Everything exists in a dark and a light version. set_dark() switches the palette and restyles every open window."""
+
 import os
 import weakref
 
 from PIL import Image, ImageDraw, ImageFont
 from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import (QAbstractSlider, QAbstractSpinBox, QApplication, QComboBox, QLabel, QLayout,
-                               QScrollArea, QScrollBar, QSizePolicy)
+from PySide6.QtWidgets import (
+    QAbstractSlider,
+    QAbstractSpinBox,
+    QApplication,
+    QComboBox,
+    QLabel,
+    QLayout,
+    QScrollArea,
+    QScrollBar,
+)
 
 from smellyfish.art import sprite
 from smellyfish.paths import HOME_DIR
@@ -16,16 +25,56 @@ from smellyfish.paths import HOME_DIR
 INK = "#221634"
 
 PALETTES = {
-    True: dict(BG="#1d1828", PANEL="#2a2438", FIELD="#141019", TEXT="#f2ecfa", MUTED="#a898c0", LAV="#c492ec",
-               LIGHT="#e2c0fa", DARK="#8c60be", DEEP="#5a3d80", HEAD="#e2c0fa", EDGE="#0a0810", SEC="#3a3150",
-               SEC_TOP="#5a4d74", SEC_BOT="#141019", SEC_HOVER="#4a3f66", GOOD="#82e696", WARN="#ffd250",
-               BAD="#ff8a8a", PREVIEW="#222430", ARROW=(226, 192, 250, 255), SHADOW=(34, 22, 52, 255),
-               SUB=(168, 152, 192, 255), TITLE=(226, 192, 250, 255)),
-    False: dict(BG="#f4f0fa", PANEL="#ffffff", FIELD="#ffffff", TEXT="#2a1f3d", MUTED="#7a6c96", LAV="#c492ec",
-                LIGHT="#eadcfb", DARK="#8c60be", DEEP="#a98bd0", HEAD="#6a3fa0", EDGE="#cbbfe0", SEC="#e6dcf3",
-                SEC_TOP="#f6f0fd", SEC_BOT="#bba9d8", SEC_HOVER="#dccff0", GOOD="#2e8f52", WARN="#a87400",
-                BAD="#c0392b", PREVIEW="#e9e3f4", ARROW=(90, 61, 128, 255), SHADOW=(226, 214, 244, 255),
-                SUB=(122, 108, 150, 255), TITLE=(106, 63, 160, 255)),
+    True: dict(
+        BG="#1d1828",
+        PANEL="#2a2438",
+        FIELD="#141019",
+        TEXT="#f2ecfa",
+        MUTED="#a898c0",
+        LAV="#c492ec",
+        LIGHT="#e2c0fa",
+        DARK="#8c60be",
+        DEEP="#5a3d80",
+        HEAD="#e2c0fa",
+        EDGE="#0a0810",
+        SEC="#3a3150",
+        SEC_TOP="#5a4d74",
+        SEC_BOT="#141019",
+        SEC_HOVER="#4a3f66",
+        GOOD="#82e696",
+        WARN="#ffd250",
+        BAD="#ff8a8a",
+        PREVIEW="#222430",
+        ARROW=(226, 192, 250, 255),
+        SHADOW=(34, 22, 52, 255),
+        SUB=(168, 152, 192, 255),
+        TITLE=(226, 192, 250, 255),
+    ),
+    False: dict(
+        BG="#f4f0fa",
+        PANEL="#ffffff",
+        FIELD="#ffffff",
+        TEXT="#2a1f3d",
+        MUTED="#7a6c96",
+        LAV="#c492ec",
+        LIGHT="#eadcfb",
+        DARK="#8c60be",
+        DEEP="#a98bd0",
+        HEAD="#6a3fa0",
+        EDGE="#cbbfe0",
+        SEC="#e6dcf3",
+        SEC_TOP="#f6f0fd",
+        SEC_BOT="#bba9d8",
+        SEC_HOVER="#dccff0",
+        GOOD="#2e8f52",
+        WARN="#a87400",
+        BAD="#c0392b",
+        PREVIEW="#e9e3f4",
+        ARROW=(90, 61, 128, 255),
+        SHADOW=(226, 214, 244, 255),
+        SUB=(122, 108, 150, 255),
+        TITLE=(106, 63, 160, 255),
+    ),
 }
 IS_DARK = True
 globals().update(PALETTES[True])
@@ -42,7 +91,7 @@ def listen(fn):
 
 def _style():
     return f"""
-* {{ font-family: "Cascadia Mono", "Consolas", monospace; }}
+* {{ font-family: "Cascadia Mono", "Consolas", "Menlo", "SF Mono", monospace; }}
 QWidget {{ background: {BG}; color: {TEXT}; font-size: 13px; }}
 QScrollArea, QScrollArea > QWidget > QWidget {{ background: {BG}; border: none; }}
 QGroupBox {{ background: {PANEL}; border: 3px solid {DARK}; border-top-color: {LAV}; border-left-color: {LAV};
@@ -122,13 +171,18 @@ def stylesheet():
     ink = (34, 22, 52, 255)
     arrow = ARROW
     tag = "d" if IS_DARK else "l"
-    check = [(x, y, ink) for x, y in ((1, 4), (2, 5), (3, 6), (4, 5), (5, 4), (6, 3), (7, 2), (2, 4), (3, 5),
-                                       (4, 4), (5, 3), (6, 2))]
+    check = [
+        (x, y, ink)
+        for x, y in ((1, 4), (2, 5), (3, 6), (4, 5), (5, 4), (6, 3), (7, 2), (2, 4), (3, 5), (4, 4), (5, 3), (6, 2))
+    ]
     down = [(x, y, arrow) for y, row in enumerate(["#####", ".###.", "..#.."]) for x, c in enumerate(row) if c == "#"]
     up = [(x, 2 - y, c) for x, y, c in down]
-    return (_style().replace("CHECK_PNG", _icon("check", check, (8, 8)))
-            .replace("ARROW_PNG", _icon("down_" + tag, down, (5, 3)))
-            .replace("UP_PNG", _icon("up_" + tag, up, (5, 3))))
+    return (
+        _style()
+        .replace("CHECK_PNG", _icon("check", check, (8, 8)))
+        .replace("ARROW_PNG", _icon("down_" + tag, down, (5, 3)))
+        .replace("UP_PNG", _icon("up_" + tag, up, (5, 3)))
+    )
 
 
 class _NoWheel(QObject):
@@ -136,8 +190,11 @@ class _NoWheel(QObject):
     the wheel scrolls the page instead."""
 
     def eventFilter(self, obj, event):
-        if event.type() == QEvent.Wheel and isinstance(obj, (QComboBox, QAbstractSpinBox, QAbstractSlider)) \
-                and not isinstance(obj, QScrollBar):
+        if (
+            event.type() == QEvent.Wheel
+            and isinstance(obj, (QComboBox, QAbstractSpinBox, QAbstractSlider))
+            and not isinstance(obj, QScrollBar)
+        ):
             w = obj.parent()
             while w is not None and not isinstance(w, QScrollArea):
                 w = w.parent()
@@ -168,21 +225,21 @@ QDialog QPushButton:hover {{ background: {LIGHT}; }}
 """
 _light = PALETTES[False]
 LIGHT_APP = f"""
-QMenu {{ background: {_light['PANEL']}; color: {INK}; border: 3px solid {DARK}; border-top-color: {LAV};
-         border-left-color: {LAV}; border-bottom-color: {_light['DEEP']}; border-right-color: {_light['DEEP']};
+QMenu {{ background: {_light["PANEL"]}; color: {INK}; border: 3px solid {DARK}; border-top-color: {LAV};
+         border-left-color: {LAV}; border-bottom-color: {_light["DEEP"]}; border-right-color: {_light["DEEP"]};
          padding: 4px; font-weight: bold; }}
 QMenu::item {{ padding: 5px 26px 5px 24px; background: transparent; }}
 QMenu::item:selected {{ background: {LAV}; color: {INK}; }}
-QMenu::item:disabled {{ color: {_light['MUTED']}; }}
+QMenu::item:disabled {{ color: {_light["MUTED"]}; }}
 QMenu::separator {{ height: 2px; background: #d9d2e8; margin: 4px 8px; }}
 QMenu::indicator {{ width: 12px; height: 12px; border: 2px solid {DARK}; background: #ffffff; margin-left: 4px; }}
-QMenu::indicator:checked {{ background: {LAV}; border-color: {_light['DEEP']}; }}
-QToolTip {{ background: {_light['PANEL']}; color: {INK}; border: 2px solid {LAV}; }}
-QDialog, QDialog QWidget {{ background: {_light['BG']}; color: {_light['TEXT']}; font-size: 13px; }}
+QMenu::indicator:checked {{ background: {LAV}; border-color: {_light["DEEP"]}; }}
+QToolTip {{ background: {_light["PANEL"]}; color: {INK}; border: 2px solid {LAV}; }}
+QDialog, QDialog QWidget {{ background: {_light["BG"]}; color: {_light["TEXT"]}; font-size: 13px; }}
 QDialog QLineEdit, QDialog QComboBox, QDialog QSpinBox, QDialog QPlainTextEdit {{ background: #ffffff;
-    color: {_light['TEXT']}; border: 3px solid {LAV}; padding: 4px 8px; }}
+    color: {_light["TEXT"]}; border: 3px solid {LAV}; padding: 4px 8px; }}
 QDialog QPushButton {{ background: {LAV}; color: {INK}; font-weight: bold; padding: 6px 14px; border: 3px solid {DARK}; }}
-QDialog QPushButton:hover {{ background: {_light['LIGHT']}; }}
+QDialog QPushButton:hover {{ background: {_light["LIGHT"]}; }}
 """
 DARK_TITLES = False
 
@@ -192,6 +249,7 @@ def dark_titlebar(widget):
     try:
         import ctypes
         import sys
+
         if sys.platform == "win32":
             on = ctypes.c_int(1 if DARK_TITLES else 0)
             ctypes.windll.dwmapi.DwmSetWindowAttribute(int(widget.winId()), 20, ctypes.byref(on), 4)
@@ -365,7 +423,8 @@ class FlowLayout(QLayout):
                     xs.append(x)
                     x += w + gap
                 for (i, item), x, w in zip(line, xs, widths):
-                    item.setGeometry(QRect(QPoint(x, y + (h - item.sizeHint().height()) // 2),
-                                           QSize(w, item.sizeHint().height())))
+                    item.setGeometry(
+                        QRect(QPoint(x, y + (h - item.sizeHint().height()) // 2), QSize(w, item.sizeHint().height()))
+                    )
             y += h + gap
         return y - gap - rect.y() + m.bottom() if lines else 0

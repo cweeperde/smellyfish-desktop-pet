@@ -1,4 +1,5 @@
 """The pet's home: arc floor lamp, bed, potted plant and a signpost, drawn at the home position."""
+
 from PIL import Image
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QPainter
@@ -66,7 +67,7 @@ SIGN_OFF = [
     "....q....",
     "..qqqqq..",
 ]
-BED_H = 3                    # the pet sits on the mattress, this many pixels above the floor
+BED_H = 3  # the pet sits on the mattress, this many pixels above the floor
 
 # left edge and width (1x pixels) of each prop relative to the home centre; ground is y = 0
 LAYOUT = {"lamp": (-21, 11), "bed": (-9, 18), "plant": (15, 7), "sign": (24, 9)}
@@ -101,8 +102,12 @@ def hit(x1, y1):
     return None
 
 
-TIPS = {"lamp": "Lamp: on/off (off = do not disturb)", "plant": "Plant: water it",
-        "sign": "Signpost: wandering on/off", "bed": "Bed: call Smellyfish home"}
+TIPS = {
+    "lamp": "Lamp: on/off (off = do not disturb)",
+    "plant": "Plant: water it",
+    "sign": "Signpost: wandering on/off",
+    "bed": "Bed: call Smellyfish home",
+}
 
 
 class HouseView(QWidget):
@@ -111,12 +116,14 @@ class HouseView(QWidget):
         super().__init__(None, flags)
         self.app = app
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_MacAlwaysShowToolWindow)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setMouseTracking(True)
         self.image = None
 
     def refresh(self):
-        from smellyfish.app import alpha_region, to_qimage
+        from smellyfish.ui.views import alpha_region, to_qimage
+
         pix = self.app.pix
         pil = compose(not self.app.cfg["dnd"], self.app.cfg["wander"])
         dpr = self.devicePixelRatioF() or 1.0

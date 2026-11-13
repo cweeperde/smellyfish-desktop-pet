@@ -2,10 +2,12 @@
 
 Without setup: Windows records which app uses the microphone right now
 (CapabilityAccessManager). Discord holding the mic means you are in a voice call.
+On macOS: Discord is running and the microphone is in use (CoreAudio).
 
 With your own Discord application (client id + secret, redirect URI added in the
 Developer Portal), the local RPC pipe also reports mute / deafen.
 """
+
 import json
 import os
 import struct
@@ -22,10 +24,18 @@ MIC_KEY = r"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\Co
 SCOPES = ["rpc", "rpc.voice.read", "rpc.notifications.read"]
 
 
+MAC_BUNDLES = {"com.hnc.Discord", "com.hnc.DiscordPTB", "com.hnc.DiscordCanary"}
+
+
 def discord_mic_in_use():
+    if sys.platform == "darwin":
+        from smellyfish.system import mac
+
+        return mac.running_app(MAC_BUNDLES) is not None and mac.mic_in_use()
     if sys.platform != "win32":
         return False
     import winreg
+
     try:
         root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, MIC_KEY)
     except OSError:
@@ -58,7 +68,9 @@ def _discord_windows():
     if sys.platform != "win32":
         return []
     import ctypes
-    from ctypes import wintypes
+
+    from smellyfish.system.wincompat import wintypes
+
     user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
     try:
         dwm = ctypes.windll.dwmapi
@@ -90,8 +102,13 @@ def _discord_windows():
         cloaked = wintypes.DWORD(0)
         if dwm is not None:
             dwm.DwmGetWindowAttribute(hwnd, 14, ctypes.byref(cloaked), ctypes.sizeof(cloaked))
-        shown = (bool(user32.IsWindowVisible(hwnd)) and not user32.IsIconic(hwnd) and not cloaked.value
-                 and rect.right - rect.left > 50 and rect.bottom - rect.top > 50)
+        shown = (
+            bool(user32.IsWindowVisible(hwnd))
+            and not user32.IsIconic(hwnd)
+            and not cloaked.value
+            and rect.right - rect.left > 50
+            and rect.bottom - rect.top > 50
+        )
         found.append((hwnd, shown))
         return True
 
@@ -101,6 +118,10 @@ def _discord_windows():
 
 def discord_on_screen():
     """True while a Discord window is open (not minimized, not only in the tray)."""
+    if sys.platform == "darwin":
+        from smellyfish.system import mac
+
+        return bool(mac.windows_of({"discord", "discord ptb", "discord canary"}))
     try:
         return any(shown for _h, shown in _discord_windows())
     except Exception:
@@ -118,9 +139,14 @@ def message_link(info):
 
 def bring_forward():
     """Restore the Discord window (also from the tray). Returns False when none was found."""
+    if sys.platform == "darwin":
+        from smellyfish.system import mac
+
+        return mac.activate(MAC_BUNDLES)
     if sys.platform != "win32":
         return False
     import ctypes
+
     wins = _discord_windows()
     if not wins:
         return False
@@ -131,15 +157,64 @@ def bring_forward():
     return True
 
 
+class _Socket:
+    """Discord's local IPC socket on macOS, with the file-like read/write the named pipe has on Windows."""
+
+    def __init__(self, path):
+        import socket
+
+        self.s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            self.s.connect(path)
+        except OSError:
+            self.s.close()
+            raise
+
+    def write(self, data):
+        self.s.sendall(data)
+
+    def read(self, n):
+        out = b""
+        while len(out) < n:
+            part = self.s.recv(n - len(out))
+            if not part:
+                break
+            out += part
+        return out
+
+    def close(self):
+        self.s.close()
+
+
+def _ipc_dirs():
+    import tempfile
+
+    dirs = [os.environ.get(k) for k in ("XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP")] + [tempfile.gettempdir(), "/tmp"]
+    out = []
+    for d in dirs:
+        if d and d not in out:
+            out.append(d)
+    return out
+
+
 class Pipe:
     def __init__(self):
         self.f = None
         for n in range(10):
-            try:
-                self.f = open(rf"\\?\pipe\discord-ipc-{n}", "r+b", buffering=0)
+            if sys.platform == "win32":
+                try:
+                    self.f = open(rf"\\?\pipe\discord-ipc-{n}", "r+b", buffering=0)
+                    break
+                except OSError:
+                    continue
+            for d in _ipc_dirs():
+                try:
+                    self.f = _Socket(os.path.join(d, f"discord-ipc-{n}"))
+                    break
+                except OSError:
+                    continue
+            if self.f is not None:
                 break
-            except OSError:
-                continue
         if self.f is None:
             raise OSError("Discord is not running")
 
@@ -169,7 +244,7 @@ class Pipe:
 
 
 class DiscordWatch(QObject):
-    changed = Signal(object)        # {"in_call", "mute", "deaf", "rpc"}
+    changed = Signal(object)  # {"in_call", "mute", "deaf", "rpc"}
     message = Signal(str, str, object)  # title, body, {"channel_id", "message_id", "guild_id", "dm"}
     rpc_status = Signal(str)
 
@@ -192,8 +267,12 @@ class DiscordWatch(QObject):
             return self._set(in_call=False, mute=False, deaf=False)
         in_call = self._rpc_call if self.state["rpc"] and self._rpc_call is not None else discord_mic_in_use()
         self._set(in_call=bool(in_call))
-        if (self.cfg.get("discord_client_id") and self.cfg.get("discord_token") and not self._alive()
-                and time.time() >= self._next_try):
+        if (
+            self.cfg.get("discord_client_id")
+            and self.cfg.get("discord_token")
+            and not self._alive()
+            and time.time() >= self._next_try
+        ):
             self.start_rpc(False)
 
     def _set(self, **kw):
@@ -229,11 +308,14 @@ class DiscordWatch(QObject):
 
     # ------------------------------------------------------------ RPC thread
     def _token_request(self, data):
-        body = urllib.parse.urlencode(dict(data, client_id=self.cfg["discord_client_id"],
-                                           client_secret=self.cfg.get("discord_client_secret", ""))).encode()
-        req = urllib.request.Request("https://discord.com/api/oauth2/token", data=body,
-                                     headers={"Content-Type": "application/x-www-form-urlencoded",
-                                              "User-Agent": "Smellyfish (desktop pet)"})
+        body = urllib.parse.urlencode(
+            dict(data, client_id=self.cfg["discord_client_id"], client_secret=self.cfg.get("discord_client_secret", ""))
+        ).encode()
+        req = urllib.request.Request(
+            "https://discord.com/api/oauth2/token",
+            data=body,
+            headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Smellyfish (desktop pet)"},
+        )
         with urllib.request.urlopen(req, timeout=15) as r:
             tok = json.loads(r.read())
         tok["expires_at"] = time.time() + tok.get("expires_in", 0) - 60
@@ -268,8 +350,13 @@ class DiscordWatch(QObject):
                 code = (msg.get("data") or {}).get("code")
                 if not code:
                     raise OSError((msg.get("data") or {}).get("message", "authorization declined"))
-                tok = self._token_request({"grant_type": "authorization_code", "code": code,
-                                           "redirect_uri": self.cfg.get("discord_redirect") or "http://localhost"})
+                tok = self._token_request(
+                    {
+                        "grant_type": "authorization_code",
+                        "code": code,
+                        "redirect_uri": self.cfg.get("discord_redirect") or "http://localhost",
+                    }
+                )
             pipe.cmd("AUTHENTICATE", {"access_token": tok["access_token"]})
             op, msg = pipe.recv()
             if msg.get("evt") == "ERROR":
@@ -304,8 +391,10 @@ class DiscordWatch(QObject):
                     self._rpc_call = bool(data.get("channel_id"))
                 elif evt == "NOTIFICATION_CREATE" and self.cfg.get("discord_messages"):
                     title, body = str(data.get("title") or "Discord"), str(data.get("body") or "")
-                    info = {"channel_id": str(data.get("channel_id") or ""),
-                            "message_id": str((data.get("message") or {}).get("id") or "")}
+                    info = {
+                        "channel_id": str(data.get("channel_id") or ""),
+                        "message_id": str((data.get("message") or {}).get("id") or ""),
+                    }
                     known = self._guilds.get(info["channel_id"])
                     if known or not info["channel_id"]:
                         if known:

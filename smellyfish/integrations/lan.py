@@ -6,6 +6,7 @@ with scrypt) into the session keys, so a wrong password never gets a readable an
 handshake is ChaCha20-Poly1305 encrypted with strictly counted nonces (no replay, no reordering).
 The host also limits message size, rate and the number of people, and blocks addresses that guess passwords.
 """
+
 import hashlib
 import json
 import re
@@ -43,14 +44,15 @@ FLOOD_FRAMES, FLOOD_SECONDS = 25, 10
 INFO = b"smellyfish-lan-1"
 AAD = b"sf1"
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
-OUTFITS = {"santa", "witch", "party", "valentine"}
-WEATHERS = {"sun", "rain", "cold", "snow"}
+OUTFITS = {"santa", "witch", "party", "valentine", "bunny", "straw", "pumpkin"}
+WEATHERS = {"sun", "rain", "cold", "snow", "storm"}
 ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
 def clean(text, limit):
-    text = "".join(" " if ch.isspace() else ch for ch in str(text or "") if unicodedata.category(ch)[0] != "C"
-                   or ch.isspace())
+    text = "".join(
+        " " if ch.isspace() else ch for ch in str(text or "") if unicodedata.category(ch)[0] != "C" or ch.isspace()
+    )
     return " ".join(text.split())[:limit]
 
 
@@ -61,19 +63,21 @@ def clean_color(value):
 def clean_look(look):
     """What a visitor wears: season outfit, weather clothes, headset, focus band (whitelisted values only)."""
     look = look if isinstance(look, dict) else {}
-    return {"o": look.get("o") if look.get("o") in OUTFITS else None,
-            "w": look.get("w") if look.get("w") in WEATHERS else None,
-            "h": "mic" if look.get("h") == "mic" else None, "b": look.get("b") is True}
+    return {
+        "o": look.get("o") if look.get("o") in OUTFITS else None,
+        "w": look.get("w") if look.get("w") in WEATHERS else None,
+        "h": "mic" if look.get("h") == "mic" else None,
+        "b": look.get("b") is True,
+    }
 
 
 def make_password():
     raw = "".join(secrets.choice(ALPHABET) for _ in range(12))
-    return "-".join(raw[i:i + 4] for i in range(0, 12, 4))
+    return "-".join(raw[i : i + 4] for i in range(0, 12, 4))
 
 
 def stretch(password, salt):
-    return hashlib.scrypt(password.strip().upper().replace("-", "").encode(), salt=salt, n=2 ** 14, r=8, p=1,
-                          dklen=32)
+    return hashlib.scrypt(password.strip().upper().replace("-", "").encode(), salt=salt, n=2**14, r=8, p=1, dklen=32)
 
 
 def derive(shared, psk, cpub, spub, cr, sr):
@@ -100,13 +104,19 @@ def local_addresses():
     out = []
     for iface in QNetworkInterface.allInterfaces():
         flags = iface.flags()
-        if not (flags & QNetworkInterface.IsUp and flags & QNetworkInterface.IsRunning) \
-                or flags & QNetworkInterface.IsLoopBack:
+        if (
+            not (flags & QNetworkInterface.IsUp and flags & QNetworkInterface.IsRunning)
+            or flags & QNetworkInterface.IsLoopBack
+        ):
             continue
         for e in iface.addressEntries():
             ip = e.ip()
-            if ip.protocol() == QAbstractSocket.IPv4Protocol and ip.isInSubnet(QHostAddress("10.0.0.0"), 8) \
-                    or ip.isInSubnet(QHostAddress("192.168.0.0"), 16) or ip.isInSubnet(QHostAddress("172.16.0.0"), 12):
+            if (
+                ip.protocol() == QAbstractSocket.IPv4Protocol
+                and ip.isInSubnet(QHostAddress("10.0.0.0"), 8)
+                or ip.isInSubnet(QHostAddress("192.168.0.0"), 16)
+                or ip.isInSubnet(QHostAddress("172.16.0.0"), 12)
+            ):
                 out.append(ip.toString())
     return sorted(set(out), key=lambda s: (not s.startswith("192.168."), s))
 
@@ -117,6 +127,7 @@ def strip_v4(addr):
 
 class Channel(QObject):
     """One TCP connection: framing plus the handshake and the encrypted messages."""
+
     message = Signal(object)
     plain = Signal(object)
     closed = Signal()
@@ -161,7 +172,7 @@ class Channel(QObject):
                 return self.close()
             if len(self.buf) < 4 + n:
                 break
-            frame, self.buf = self.buf[4:4 + n], self.buf[4 + n:]
+            frame, self.buf = self.buf[4 : 4 + n], self.buf[4 + n :]
             if self.recv_key is None:
                 try:
                     obj = json.loads(frame)
@@ -210,11 +221,11 @@ class Member:
 
 
 class LanService(QObject):
-    state = Signal(str)                    # "off", "hosting", "connecting", "joined"
+    state = Signal(str)  # "off", "hosting", "connecting", "joined"
     members = Signal(list)
-    chat = Signal(str, str)                # name, text
+    chat = Signal(str, str)  # name, text
     letter = Signal(str, str, str, object)  # name, color, text, look
-    visit = Signal(str, str, object)       # name, color, look
+    visit = Signal(str, str, object)  # name, color, look
     notice = Signal(str)
     lobbies = Signal(list)
 
@@ -226,12 +237,12 @@ class LanService(QObject):
         self.me = None
         self.roster = []
         self.server = None
-        self.pending = {}                  # channel -> handshake data (host side)
-        self.clients = {}                  # member id -> Member
+        self.pending = {}  # channel -> handshake data (host side)
+        self.clients = {}  # member id -> Member
         self.next_id = 1
         self.bans, self.fails = {}, {}
         self.salt = self.lobby_id = b""
-        self.channel = None                # client side
+        self.channel = None  # client side
         self.hs = None
         self.local_last = {}
         self.look_provider = None
@@ -248,8 +259,9 @@ class LanService(QObject):
         want = self.browsing or self.role == "host"
         if want and self.udp_in is None:
             sock = QUdpSocket(self)
-            if sock.bind(QHostAddress.AnyIPv4, DISCOVERY_PORT,
-                         QAbstractSocket.ShareAddress | QAbstractSocket.ReuseAddressHint):
+            if sock.bind(
+                QHostAddress.AnyIPv4, DISCOVERY_PORT, QAbstractSocket.ShareAddress | QAbstractSocket.ReuseAddressHint
+            ):
                 sock.readyRead.connect(self.read_announce)
                 self.udp_in = sock
         elif not want and self.udp_in is not None:
@@ -273,8 +285,10 @@ class LanService(QObject):
         sent = False
         for iface in QNetworkInterface.allInterfaces():
             flags = iface.flags()
-            if not (flags & QNetworkInterface.IsUp and flags & QNetworkInterface.IsRunning) \
-                    or flags & QNetworkInterface.IsLoopBack:
+            if (
+                not (flags & QNetworkInterface.IsUp and flags & QNetworkInterface.IsRunning)
+                or flags & QNetworkInterface.IsLoopBack
+            ):
                 continue
             for e in iface.addressEntries():
                 if e.ip().protocol() == QAbstractSocket.IPv4Protocol and not e.broadcast().isNull():
@@ -290,9 +304,18 @@ class LanService(QObject):
     def announce(self):
         if self.role != "host" or self.server is None:
             return
-        data = json.dumps({"app": "smellyfish", "v": PROTOCOL, "ver": __version__, "id": self.lobby_id.hex(),
-                           "name": self.lobby_name, "port": self.server.serverPort(), "n": len(self.clients) + 1,
-                           "max": MAX_MEMBERS}).encode()
+        data = json.dumps(
+            {
+                "app": "smellyfish",
+                "v": PROTOCOL,
+                "ver": __version__,
+                "id": self.lobby_id.hex(),
+                "name": self.lobby_name,
+                "port": self.server.serverPort(),
+                "n": len(self.clients) + 1,
+                "max": MAX_MEMBERS,
+            }
+        ).encode()
         self.broadcast(data)
 
     def read_announce(self):
@@ -312,10 +335,16 @@ class LanService(QObject):
                 lid, port = str(obj["id"])[:32], int(obj["port"])
                 if not 1024 <= port <= 65535:
                     continue
-                item = {"id": lid, "name": clean(obj.get("name"), 24) or "Lobby", "port": port,
-                        "ip": strip_v4(d.senderAddress().toString()), "n": int(obj.get("n", 1)),
-                        "max": int(obj.get("max", MAX_MEMBERS)), "seen": time.time(),
-                        "ver": clean(obj.get("ver"), 12) or "?"}
+                item = {
+                    "id": lid,
+                    "name": clean(obj.get("name"), 24) or "Lobby",
+                    "port": port,
+                    "ip": strip_v4(d.senderAddress().toString()),
+                    "n": int(obj.get("n", 1)),
+                    "max": int(obj.get("max", MAX_MEMBERS)),
+                    "seen": time.time(),
+                    "ver": clean(obj.get("ver"), 12) or "?",
+                }
                 item["ok"] = obj.get("v") == PROTOCOL and compatible(item["ver"])
             except (ValueError, KeyError, TypeError):
                 continue
@@ -518,8 +547,12 @@ class LanService(QObject):
         self.leave()
         self.role = "client"
         self.password = password
-        self.hs = {"name": clean(name, NAME_LIMIT) or "Guest", "color": clean_color(color),
-                   "eph": X25519PrivateKey.generate(), "r": secrets.token_bytes(16)}
+        self.hs = {
+            "name": clean(name, NAME_LIMIT) or "Guest",
+            "color": clean_color(color),
+            "eph": X25519PrivateKey.generate(),
+            "r": secrets.token_bytes(16),
+        }
         sock = QTcpSocket(self)
         self.channel = Channel(sock, self)
         self.channel.plain.connect(self.client_hello)
@@ -537,16 +570,19 @@ class LanService(QObject):
             self.channel.close()
 
     def client_connected(self):
-        self.channel.send_plain({"p": PROTOCOL, "ver": __version__, "k": raw_pub(self.hs["eph"]).hex(),
-                                 "r": self.hs["r"].hex()})
+        self.channel.send_plain(
+            {"p": PROTOCOL, "ver": __version__, "k": raw_pub(self.hs["eph"]).hex(), "r": self.hs["r"].hex()}
+        )
 
     def client_hello(self, obj):
         hs = self.hs
         if hs is None or self.channel.recv_key is not None:
             return self.channel.close()
         if obj.get("err") == "version":
-            self.fail_reason = (f"That lobby runs Smellyfish {clean(obj.get('ver'), 12)} and you have "
-                                f"{__version__}. Update so both match.")
+            self.fail_reason = (
+                f"That lobby runs Smellyfish {clean(obj.get('ver'), 12)} and you have "
+                f"{__version__}. Update so both match."
+            )
             return self.channel.close()
         try:
             spub, sr, salt = bytes.fromhex(obj["k"]), bytes.fromhex(obj["r"]), bytes.fromhex(obj["s"])
@@ -583,16 +619,23 @@ class LanService(QObject):
         roster = []
         for it in (items if isinstance(items, list) else [])[:MAX_MEMBERS]:
             if isinstance(it, dict) and isinstance(it.get("id"), int):
-                roster.append({"id": it["id"], "name": clean(it.get("name"), NAME_LIMIT),
-                               "color": clean_color(it.get("color")), "owner": it.get("owner") is True})
+                roster.append(
+                    {
+                        "id": it["id"],
+                        "name": clean(it.get("name"), NAME_LIMIT),
+                        "color": clean_color(it.get("color")),
+                        "owner": it.get("owner") is True,
+                    }
+                )
         self.roster = roster
         self.members.emit(roster)
 
     def client_closed(self):
         joined = self.me is not None
         if self.role == "client":
-            self.notice.emit(self.fail_reason or ("Left the lobby" if joined else
-                                                  "Could not join: wrong password or no lobby there"))
+            self.notice.emit(
+                self.fail_reason or ("Left the lobby" if joined else "Could not join: wrong password or no lobby there")
+            )
             self.fail_reason = ""
             self.leave()
 
@@ -603,8 +646,12 @@ class LanService(QObject):
         if kind == "chat":
             self.chat.emit(name, clean(msg.get("text"), TEXT_LIMIT["chat"]))
         elif kind == "letter":
-            self.letter.emit(name, clean_color(msg.get("color")), clean(msg.get("text"), TEXT_LIMIT["letter"]),
-                             clean_look(msg.get("look")))
+            self.letter.emit(
+                name,
+                clean_color(msg.get("color")),
+                clean(msg.get("text"), TEXT_LIMIT["letter"]),
+                clean_look(msg.get("look")),
+            )
         elif kind == "visit":
             self.visit.emit(name, clean_color(msg.get("color")), clean_look(msg.get("look")))
         elif kind == "notice":

@@ -1,13 +1,38 @@
 """Makes the pet less predictable: an energy level over the day, irregular timing and actions that avoid
 repeating themselves."""
+
 import math
 import random
 import time
 from collections import deque
 
 # energy by hour of the day: slow mornings, a lively late morning, an after-lunch dip, tired late evenings
-CURVE = [0.45, 0.4, 0.35, 0.35, 0.4, 0.5, 0.65, 0.8, 0.95, 1.1, 1.15, 1.1, 0.95, 0.85, 0.9, 1.0,
-         1.05, 1.0, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5]
+CURVE = [
+    0.45,
+    0.4,
+    0.35,
+    0.35,
+    0.4,
+    0.5,
+    0.65,
+    0.8,
+    0.95,
+    1.1,
+    1.15,
+    1.1,
+    0.95,
+    0.85,
+    0.9,
+    1.0,
+    1.05,
+    1.0,
+    0.95,
+    0.9,
+    0.8,
+    0.7,
+    0.6,
+    0.5,
+]
 
 LIVELY = {"juggle", "yoyo", "paper_plane", "gaming", "bubblegum", "doodle"}
 CALM = {"read", "coffee", "look_around", "bubbles", "yawn"}

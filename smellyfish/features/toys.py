@@ -1,10 +1,10 @@
 """Little physics toys: a ball to throw and fetch, and fish snacks."""
-import math
+
 import time
 
 from PIL import Image
 from PySide6.QtCore import QPoint, Qt, QTimer
-from PySide6.QtGui import QCursor, QGuiApplication, QPainter
+from PySide6.QtGui import QCursor, QPainter
 from PySide6.QtWidgets import QWidget
 
 from smellyfish.art import sprite
@@ -19,6 +19,7 @@ class Toy(QWidget):
         super().__init__(None, flags)
         self.app, self.kind = app, kind
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_MacAlwaysShowToolWindow)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         rows = SPRITES[kind]
         self.w1, self.h1 = len(rows[0]), len(rows)
@@ -40,7 +41,8 @@ class Toy(QWidget):
         self.show()
 
     def refresh(self):
-        from smellyfish.app import alpha_region, to_qimage
+        from smellyfish.ui.views import alpha_region, to_qimage
+
         pix = self.app.pix
         dpr = self.devicePixelRatioF() or 1.0
         dev = max(1, round(pix * dpr))
@@ -105,6 +107,7 @@ class Toy(QWidget):
 
     def _check_support(self):
         from smellyfish.system import surfaces
+
         now = time.time()
         if now - getattr(self, "_checked", 0) < 0.3:
             return

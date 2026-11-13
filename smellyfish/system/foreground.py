@@ -1,12 +1,18 @@
 """The foreground window: notices hectic window switching and a window being dragged around."""
+
 import ctypes
 import sys
 import time
 from collections import deque
-from ctypes import wintypes
+
+from smellyfish.system.wincompat import wintypes
 
 
 def _foreground():
+    if sys.platform == "darwin":
+        from smellyfish.system import mac
+
+        return mac.front_window()
     if sys.platform != "win32":
         return None, None
     user32 = ctypes.windll.user32
@@ -44,7 +50,10 @@ class Foreground:
                 return "hectic"
             return None
         if rect and prev_rect and rect != prev_rect:
-            same_size = (rect[2] - rect[0], rect[3] - rect[1]) == (prev_rect[2] - prev_rect[0], prev_rect[3] - prev_rect[1])
+            same_size = (rect[2] - rect[0], rect[3] - rect[1]) == (
+                prev_rect[2] - prev_rect[0],
+                prev_rect[3] - prev_rect[1],
+            )
             if same_size:
                 self.moved += abs(rect[0] - prev_rect[0]) + abs(rect[1] - prev_rect[1])
                 self.moving_since = self.moving_since or now

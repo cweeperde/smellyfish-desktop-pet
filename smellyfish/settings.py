@@ -1,12 +1,16 @@
-"""Persistent user settings and Windows autostart."""
+"""Persistent user settings and autostart (Windows registry, macOS LaunchAgent)."""
+
+import base64
 import contextlib
+import ctypes
 import json
 import logging
 import os
 import sys
 import time
 
-from smellyfish.paths import HOME_DIR as DIR, pet_command
+from smellyfish.paths import HOME_DIR as DIR
+from smellyfish.paths import pet_command
 
 log = logging.getLogger("smellyfish.settings")
 
@@ -69,6 +73,12 @@ DEFAULTS = {
     "show_house": False,
     "plant_watered_at": 0,
     "codex_hooks": False,
+    "gemini_hooks": False,
+    "cursor_hooks": False,
+    "copilot_hooks": False,
+    "antigravity_hooks": False,
+    "shell_menu": False,
+    "deepseek_hooks": False,
     "usage_warn": 80,
     "usage_critical": True,
     "usage_warned": {},
@@ -94,11 +104,21 @@ DEFAULTS = {
     "break_nudge": True,
     "temp_unit": "C",
     "seasonal": True,
+    "hat": "auto",
+    "accessory": "auto",
     "auto_water": True,
     "focus_min": 25,
     "break_min": 5,
-    "hotkeys": {"toggle": "Ctrl+Alt+F9", "home": "Ctrl+Alt+F10", "dnd": "Ctrl+Alt+F11", "history": "Ctrl+Alt+F12",
-                "focus": "Ctrl+Alt+F8", "chase": "Ctrl+Alt+F7", "mini": "Ctrl+Alt+F6", "todo": "Ctrl+Alt+F5"},
+    "hotkeys": {
+        "toggle": "Ctrl+Alt+F9",
+        "home": "Ctrl+Alt+F10",
+        "dnd": "Ctrl+Alt+F11",
+        "history": "Ctrl+Alt+F12",
+        "focus": "Ctrl+Alt+F8",
+        "chase": "Ctrl+Alt+F7",
+        "mini": "Ctrl+Alt+F6",
+        "todo": "Ctrl+Alt+F5",
+    },
     "skin": "lavender",
     "skin_color": "#c492ec",
     "weather": False,
@@ -125,11 +145,133 @@ DEFAULTS = {
     "calendar_remind_min": 10,
     "calendar_notified": {},
     "media": True,
+    "media_note": "playing",
     "media_exclude": [],
+    "mac_media_ok": False,
     "tentacle_sim": True,
     "stats": {},
     "achievements": {},
 }
+
+
+if sys.platform == "darwin":
+    # these need a macOS permission, so they start off and ask when switched on
+    DEFAULTS.update(beat_sync=False, sit_on_icons=False, trash_watch=False)
+
+SECRETS = ("discord_client_secret", "discord_token")
+SEALED = ("_dpapi", "_kc")
+KEYCHAIN_SERVICE = "Smellyfish"
+_KEY = {}
+
+
+class _Blob(ctypes.Structure):
+    _fields_ = [("size", ctypes.c_ulong), ("data", ctypes.POINTER(ctypes.c_char))]
+
+
+def _dpapi(raw, protect):
+    src = _Blob(len(raw), ctypes.cast(ctypes.create_string_buffer(raw, len(raw)), ctypes.POINTER(ctypes.c_char)))
+    out = _Blob()
+    crypt = ctypes.windll.crypt32
+    fn = crypt.CryptProtectData if protect else crypt.CryptUnprotectData
+    if not fn(ctypes.byref(src), None, None, None, None, 1, ctypes.byref(out)):
+        raise OSError("DPAPI failed")
+    try:
+        return ctypes.string_at(out.data, out.size)
+    finally:
+        ctypes.windll.kernel32.LocalFree(out.data)
+
+
+def _keychain_account():
+    import hashlib
+
+    if os.environ.get("SMELLYFISH_HOME"):
+        return "settings-key-" + hashlib.sha256(DIR.encode()).hexdigest()[:10]
+    return "settings-key"
+
+
+def _mac_key():
+    """A random key kept in the login Keychain; the secrets in settings.json are encrypted with it."""
+    if "key" in _KEY:
+        return _KEY["key"]
+    import subprocess
+
+    account = _keychain_account()
+    r = subprocess.run(
+        ["/usr/bin/security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", account, "-w"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    hexkey = r.stdout.strip()
+    if r.returncode == 0 and len(hexkey) == 64:
+        key = bytes.fromhex(hexkey)
+    elif r.returncode == 44:  # not found: first use
+        key = os.urandom(32)
+        # through stdin, so the key never shows up in a process list
+        cmd = f"add-generic-password -U -s {KEYCHAIN_SERVICE} -a {account} -l Smellyfish -w {key.hex()}" + chr(10)
+        subprocess.run(["/usr/bin/security", "-i"], input=cmd, capture_output=True, text=True, timeout=15)
+        _KEY.pop("key", None)
+        check = subprocess.run(
+            ["/usr/bin/security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", account, "-w"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if check.stdout.strip() != key.hex():
+            raise OSError("Keychain refused the key")
+    else:
+        raise OSError(f"Keychain not readable ({r.returncode})")
+    _KEY["key"] = key
+    return key
+
+
+def _mac_crypt(raw, protect):
+    from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+
+    box = ChaCha20Poly1305(_mac_key())
+    if protect:
+        nonce = os.urandom(12)
+        return nonce + box.encrypt(nonce, raw, b"smellyfish")
+    return box.decrypt(raw[:12], raw[12:], b"smellyfish")
+
+
+def seal(value):
+    """Secrets are stored encrypted for this user (Windows: DPAPI, macOS: a key in the Keychain), so a copied
+    settings file does not reveal them."""
+    if not value or sys.platform not in ("win32", "darwin"):
+        return value
+    try:
+        raw = json.dumps(value).encode()
+        if sys.platform == "darwin":
+            return {"_kc": base64.b64encode(_mac_crypt(raw, True)).decode()}
+        return {"_dpapi": base64.b64encode(_dpapi(raw, True)).decode()}
+    except Exception:
+        return value
+
+
+def unseal(value):
+    if not (isinstance(value, dict) and any(k in value for k in SEALED)):
+        return value
+    try:
+        if "_kc" in value:
+            return json.loads(_mac_crypt(base64.b64decode(value["_kc"]), False))
+        return json.loads(_dpapi(base64.b64decode(value["_dpapi"]), False))
+    except Exception:
+        return None
+
+
+def _plain(data):
+    """The known keys of a settings file, with secrets readable; unreadable secrets fall back to the default."""
+    out = {k: v for k, v in data.items() if k in DEFAULTS}
+    for k in SECRETS:
+        if k in out:
+            v = unseal(out[k])
+            out[k] = DEFAULTS[k] if v is None else v
+    return out
+
+
+def _unsealed(data):
+    return any(data.get(k) and not (isinstance(data[k], dict) and any(s in data[k] for s in SEALED)) for k in SECRETS)
 
 
 class Settings(dict):
@@ -159,12 +301,19 @@ class Settings(dict):
                     error = e
                     break
             if data is not None:
-                dict.update(self, {k: v for k, v in data.items() if k in DEFAULTS})
+                dict.update(self, _plain(data))
                 if "onboarded" not in data:
                     self["onboarded"] = True
                 self._backup()
-                log.info("loaded settings (house %s, %d achievements)", self.get("show_house"),
-                         len(self.get("achievements") or {}))
+                if sys.platform in ("win32", "darwin") and _unsealed(data):
+                    self._dirty.update(k for k in SECRETS if data.get(k))
+                    if self.save():
+                        self._seal_backups()
+                log.info(
+                    "loaded settings (house %s, %d achievements)",
+                    self.get("show_house"),
+                    len(self.get("achievements") or {}),
+                )
             elif isinstance(error, ValueError):
                 log.warning("settings.json is damaged (%s), restoring from a backup", error)
                 self._recover()
@@ -179,13 +328,30 @@ class Settings(dict):
                 os.replace(newer, older)
         try:
             import shutil
+
             shutil.copy2(PATH, f"{PATH}.bak1")
         except OSError:
             pass
 
+    def _seal_backups(self):
+        for i in (1, 2, 3):
+            path = f"{PATH}.bak{i}"
+            try:
+                with open(path, encoding="utf-8") as f:
+                    data = json.load(f)
+                if not _unsealed(data):
+                    continue
+                data.update({k: seal(data[k]) for k in SECRETS if data.get(k)})
+                with open(path + ".tmp", "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+                os.replace(path + ".tmp", path)
+            except (OSError, ValueError):
+                continue
+
     def _recover(self):
         """The file could not be read: keep it, then try the newest readable backup."""
         import time
+
         try:
             os.replace(PATH, os.path.join(DIR, f"settings.broken-{int(time.time())}.json"))
         except OSError:
@@ -198,7 +364,7 @@ class Settings(dict):
             try:
                 with open(f"{PATH}.bak{i}", encoding="utf-8") as f:
                     data = json.load(f)
-                dict.update(self, {k: v for k, v in data.items() if k in DEFAULTS})
+                dict.update(self, _plain(data))
                 return True
             except (OSError, ValueError):
                 continue
@@ -231,7 +397,7 @@ class Settings(dict):
                     disk = json.load(f)
             except (OSError, ValueError):
                 disk = {}
-            merged = dict(DEFAULTS, **{k: v for k, v in disk.items() if k in DEFAULTS})
+            merged = dict(DEFAULTS, **_plain(disk))
             merged.update({k: self[k] for k in self._dirty})
             if "stats" in self._dirty:
                 merged["stats"] = merge_stats(disk.get("stats"), self["stats"])
@@ -239,7 +405,7 @@ class Settings(dict):
                 merged["achievements"] = merge_unlocked(disk.get("achievements"), self["achievements"])
             tmp = PATH + f".{os.getpid()}.tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(merged, f, indent=2)
+                json.dump(dict(merged, **{k: seal(merged[k]) for k in SECRETS}), f, indent=2)
             for _ in range(50):
                 try:
                     os.replace(tmp, PATH)
@@ -259,25 +425,17 @@ class Settings(dict):
 
 
 def merge_stats(disk, mine):
-    """Counters only grow, so a stale copy (an old backup, a second process) can never lower them.
-    The daily click counter follows whichever side has the later day."""
+    """Counters only grow, so a stale copy (an old backup, a second process) can never lower them."""
     disk, mine = dict(disk or {}) if isinstance(disk, dict) else {}, dict(mine or {})
     out = dict(disk)
     for k, v in mine.items():
         old = out.get(k)
-        if k in ("clicks_today", "clicks_day"):
-            continue
         if isinstance(v, (int, float)) and isinstance(old, (int, float)) and not isinstance(v, bool):
             out[k] = max(old, v)
         elif isinstance(v, str) and isinstance(old, str):
             out[k] = max(old, v)
         else:
             out[k] = v
-    dd, md = str(disk.get("clicks_day") or ""), str(mine.get("clicks_day") or "")
-    if md > dd:
-        out["clicks_day"], out["clicks_today"] = md, mine.get("clicks_today", 0)
-    elif md == dd and md:
-        out["clicks_today"] = max(disk.get("clicks_today", 0), mine.get("clicks_today", 0))
     return out
 
 
@@ -299,10 +457,12 @@ def _file_lock(path, timeout=5.0):
             try:
                 if sys.platform == "win32":
                     import msvcrt
+
                     f.seek(0)
                     msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
                 else:
                     import fcntl
+
                     fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 locked = True
                 break
@@ -316,10 +476,12 @@ def _file_lock(path, timeout=5.0):
             try:
                 if sys.platform == "win32":
                     import msvcrt
+
                     f.seek(0)
                     msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
                 else:
                     import fcntl
+
                     fcntl.flock(f.fileno(), fcntl.LOCK_UN)
             except OSError:
                 pass
@@ -330,9 +492,24 @@ def autostart_command():
     return pet_command()
 
 
+LAUNCH_AGENT = os.path.join(os.path.expanduser("~"), "Library", "LaunchAgents", "io.github.cweeperde.smellyfish.plist")
+
+
+def _launch_args():
+    from smellyfish import paths
+
+    bundle = paths.app_bundle()
+    if bundle:
+        return ["/usr/bin/open", "-a", bundle]
+    return [sys.executable, "-m", "smellyfish"]
+
+
 def autostart_enabled():
+    if sys.platform == "darwin":
+        return os.path.exists(LAUNCH_AGENT)
     try:
         import winreg
+
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
             winreg.QueryValueEx(k, RUN_NAME)
         return True
@@ -341,7 +518,29 @@ def autostart_enabled():
 
 
 def set_autostart(on):
+    if sys.platform == "darwin":
+        import plistlib
+
+        if not on:
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(LAUNCH_AGENT)
+            return
+        from smellyfish import paths
+
+        os.makedirs(os.path.dirname(LAUNCH_AGENT), exist_ok=True)
+        job = {
+            "Label": "io.github.cweeperde.smellyfish",
+            "ProgramArguments": _launch_args(),
+            "RunAtLoad": True,
+            "ProcessType": "Interactive",
+        }
+        if not paths.app_bundle():
+            job["WorkingDirectory"] = os.path.dirname(paths.APP_DIR)
+        with open(LAUNCH_AGENT, "wb") as f:
+            plistlib.dump(job, f)
+        return
     import winreg
+
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
         if on:
             winreg.SetValueEx(k, RUN_NAME, 0, winreg.REG_SZ, autostart_command())

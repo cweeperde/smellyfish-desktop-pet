@@ -1,11 +1,14 @@
 """Desktop icon positions (Windows). Reads geometry only (no names) from the desktop list view.
+macOS asks Finder instead (see mac.desktop_icons).
 
 Icons the pet may sit on must have free desktop above them, so it never covers another icon.
 """
+
 import ctypes
 import sys
 import time
-from ctypes import wintypes
+
+from smellyfish.system.wincompat import wintypes
 
 IS_WIN = sys.platform == "win32"
 
@@ -35,8 +38,15 @@ def _winapi():
         u.IsWindowVisible.argtypes = [H]
         u.ClientToScreen.argtypes = [H, ctypes.POINTER(wintypes.POINT)]
         u.GetWindowThreadProcessId.argtypes = [H, ctypes.POINTER(wintypes.DWORD)]
-        u.SendMessageTimeoutW.argtypes = [H, wintypes.UINT, ctypes.c_size_t, ctypes.c_size_t, wintypes.UINT,
-                                          wintypes.UINT, ctypes.POINTER(ctypes.c_size_t)]
+        u.SendMessageTimeoutW.argtypes = [
+            H,
+            wintypes.UINT,
+            ctypes.c_size_t,
+            ctypes.c_size_t,
+            wintypes.UINT,
+            wintypes.UINT,
+            ctypes.POINTER(ctypes.c_size_t),
+        ]
         k.OpenProcess.argtypes, k.OpenProcess.restype = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD], wintypes.HANDLE
         k.VirtualAllocEx.argtypes = [wintypes.HANDLE, P, ctypes.c_size_t, wintypes.DWORD, wintypes.DWORD]
         k.VirtualAllocEx.restype = P
@@ -92,14 +102,17 @@ def _read(to_logical):
             u.ClientToScreen(lv, ctypes.byref(origin))
             for i in range(count):
                 pair = []
-                for code in (0, 1):                      # LVIR_BOUNDS, LVIR_ICON
+                for code in (0, 1):  # LVIR_BOUNDS, LVIR_ICON
                     r = wintypes.RECT(code, 0, 0, 0)
                     k.WriteProcessMemory(proc, remote, ctypes.byref(r), ctypes.sizeof(r), None)
                     if not send(LVM_GETITEMRECT, i, remote) or not res.value:
                         return None
                     k.ReadProcessMemory(proc, remote, ctypes.byref(r), ctypes.sizeof(r), None)
-                    pair.append(to_logical(wintypes.RECT(r.left + origin.x, r.top + origin.y,
-                                                         r.right + origin.x, r.bottom + origin.y)))
+                    pair.append(
+                        to_logical(
+                            wintypes.RECT(r.left + origin.x, r.top + origin.y, r.right + origin.x, r.bottom + origin.y)
+                        )
+                    )
                 out.append((pair[0], pair[1]))
         finally:
             k.VirtualFreeEx(proc, remote, 0, MEM_RELEASE)

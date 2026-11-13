@@ -1,15 +1,23 @@
 """Debug aid: draws the edges Smellyfish thinks it can stand on (green = windows, yellow = desktop items)."""
-from PySide6.QtCore import QRect, Qt, QTimer
+
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
 
 class EdgesOverlay(QWidget):
     def __init__(self, app):
-        super().__init__(None, Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint
-                         | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus)
+        super().__init__(
+            None,
+            Qt.FramelessWindowHint
+            | Qt.Tool
+            | Qt.WindowStaysOnTopHint
+            | Qt.WindowTransparentForInput
+            | Qt.WindowDoesNotAcceptFocus,
+        )
         self.app = app
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_MacAlwaysShowToolWindow)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
         self.items = []

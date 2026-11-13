@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Smellyfish - a pixel jellyfish for your desktop</title>
-<meta name="description" content="A pixel-art jellyfish for your Windows desktop. It shows what Claude Code, Codex and your PC are doing, keeps your calendar and knows what music is playing.">
+<meta name="description" content="A pixel-art jellyfish for your Windows or Mac desktop. It shows what Claude Code, Codex and your computer are doing, keeps your calendar and knows what music is playing.">
 <link rel="icon" href="media/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -133,14 +133,15 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
     <div class="bar"><span class="dot"></span>c:\smellyfish\readme.md<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
     <div class="body hero">
       <div>
-        <p class="kicker">Desktop pet // Windows 10 &middot; 11</p>
+        <p class="kicker">Desktop pet // Windows 10 &middot; 11 // macOS 13+</p>
         <h1>SMELLY<span class="accent">FISH</span><span class="ext">.exe</span></h1>
-        <p>A pixel jellyfish that sits on your windows and shows what Claude Code, Codex and your PC are doing.
+        <p>A pixel jellyfish that sits on your windows and shows what Claude Code, Codex and your computer are doing.
           Questions from Claude Code appear in speech bubbles you answer with a click. It keeps your calendar,
           knows what music is playing, and when nothing is going on it naps in its own bed.</p>
         <div class="prompt">&gt; Smellyfish.exe</div>
         <div class="actions">
-          <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.exe" download>Download</a>
+          <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.exe" download>Windows</a>
+          <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.dmg" download>macOS</a>
           <a class="btn ghost" href="https://github.com/cweeperde/smellyfish-desktop-pet">Source code</a>
         </div>
       </div>
@@ -161,7 +162,7 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
     <div class="body watch">
       <div>
         <h2>Next to your agent</h2>
-        <p>With the integration switched on, the jellyfish shows what Claude Code or Codex is doing and for how
+        <p>With the integration switched on, the jellyfish shows what Claude Code, Codex or another coding agent is doing and for how
           long, and tells you when a task is done or needs you. Questions and permission prompts are answered
           in the bubble; the little x sends them back to the terminal.</p>
         <div class="status">
@@ -192,7 +193,7 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
     <div class="bar"><span class="dot"></span>music.wav<span class="btns"><span>_</span><span>&#9633;</span><span>x</span></span></div>
     <div class="body">
       <h2>Music and movement</h2>
-      <p>Whatever plays in Spotify, a browser or another player: the jellyfish puts on headphones, a note
+      <p>Whatever plays in Spotify, a browser or another player (on a Mac: Spotify and Music): the jellyfish puts on headphones, a note
         appears in its badge, and a click on the note gives you play, pause and skip. It does not dance
         all the time; it bops along for a while and then goes on with its day.</p>
       <img class="shot" src="media/music.gif" alt="The jellyfish with headphones next to a bubble with play, pause and skip">
@@ -210,12 +211,14 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
         <li><b>window hopping</b><span>sits on window edges, jumps between them, climbs their sides and hangs from a tentacle under one now and then</span></li>
         <li><b>grab &amp; throw</b><span>dangles from your cursor, swings, flies and lands with a squish</span></li>
         <li><b>a home</b><span>lamp for do-not-disturb, a bed, a plant that tells you the weather (optional)</span></li>
-        <li><b>pc reactions</b><span>busy CPU, Discord calls, a full recycle bin, fullscreen games, a cartoon zap from the charger</span></li>
+        <li><b>reactions</b><span>busy CPU, Discord calls, a full recycle bin or Trash, fullscreen games, a cartoon zap from the charger</span></li>
         <li><b>moods</b><span>livelier in the late morning, sleepy at night, startled when you switch windows very fast</span></li>
         <li><b>head pats</b><span>pet its head or tickle its tentacles with your cursor</span></li>
         <li><b>mini mode</b><span>peeks in from the screen edge; drag it up or down, pull it out to bring it back</span></li>
         <li><b>toys &amp; trophies</b><span>a ball to fetch, fish snacks, a focus timer and achievements</span></li>
-        <li><b>local chat</b><span>talk to your own Ollama or llama.cpp model; nothing leaves your PC</span></li>
+        <li><b>local chat</b><span>talk to your own Ollama or llama.cpp model; nothing leaves your computer</span></li>
+        <li><b>right-click</b><span>optional entry for files and folders: details with SHA-256, or start a CLI agent right there</span></li>
+        <li><b>many agents</b><span>Claude Code, Codex, Gemini CLI, Cursor, Copilot, Antigravity and DeepSeek-TUI, each with its own tag in the badge</span></li>
         <li><b>lan lobby</b><span>friends on your network step out of a door in their own colors and hand over letters; encrypted</span></li>
       </ul>
       <img class="shot" style="margin-top:22px" src="media/animations.gif" alt="Animation overview">
@@ -240,7 +243,7 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
       <p>Discord mute and deafen status, messages while Discord is minimized, the weather at its plant, a focus
         timer, usage warnings, achievements and reminders. Timers and counters appear when something changes
         or when you point at the jellyfish.</p>
-      <img class="shot" src="media/features.gif" alt="Discord status, weather, focus timer, usage limits, recycle bin, achievements, task timer, reminders, charging zap, calendar, local chat and lobby visits">
+      <img class="shot" src="media/features.gif" alt="Discord status, weather, focus timer, usage limits, recycle bin, achievements, task timer, reminders, charging zap, calendar, local chat, lobby visits and file details">
       <img class="shot" style="margin-top:22px" src="media/visit.gif" alt="A friend's jellyfish steps out of a door and hands over a letter">
       <p class="caption">// visits are optional; nothing listens until you open a lobby.</p>
     </div>
@@ -251,14 +254,18 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
     <div class="body">
       <h2 style="color:var(--ink)">Get it</h2>
       <ol class="steps">
-        <li>Download <b>Smellyfish.exe</b>; the button always gets the latest version.</li>
-        <li>Run it. It is a single portable file, there is nothing to install.</li>
+        <li>Windows: download <b>Smellyfish.exe</b> and run it. It is a single portable file, there is nothing to
+          install.</li>
+        <li>macOS 13 or newer: open <b>Smellyfish.dmg</b> and drag Smellyfish into Applications. The first start
+          is blocked once because the app is not notarized: click Open Anyway under System Settings &gt; Privacy &amp;
+          Security.</li>
         <li>Follow the short tour. Later, right-click the jellyfish for the menu and the settings.</li>
       </ol>
-      <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.exe" download>Download latest &rarr;</a>
+      <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.exe" download>Windows &rarr;</a>
+      <a class="btn" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.dmg" download>macOS &rarr;</a>
       <a class="btn ghost" href="https://github.com/cweeperde/smellyfish-desktop-pet/releases">All releases</a>
-      <p class="trust">Talks to Claude Code and Codex only on your own PC (127.0.0.1). Hooks are added only after
-        you agree. Calendar links are only downloaded, song info comes from Windows itself, and updates come from
+      <p class="trust">Talks to your coding agents only on your own computer (127.0.0.1). Hooks are added only after
+        you agree. Calendar links are only downloaded, song info comes from your own computer, and updates come from
         this repository's releases, checked against a SHA-256 digest before they are installed.</p>
     </div>
   </section>

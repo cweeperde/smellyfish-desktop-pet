@@ -23,18 +23,18 @@ jobs:
       name: github-pages
       url: ${{ steps.d1.outputs.page_url || steps.d2.outputs.page_url || steps.d3.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b  # v5.0.0
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa  # v3.0.1
         with:
           path: docs
 
       # GitHub's deployment step now and then hangs until its own timeout. Try up to three times.
       - name: Deploy
         id: d1
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e  # v4.0.5
         continue-on-error: true
         with:
           timeout: 420000
@@ -42,7 +42,7 @@ jobs:
       - name: Deploy (second try)
         id: d2
         if: steps.d1.outcome != 'success'
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e  # v4.0.5
         continue-on-error: true
         with:
           timeout: 420000
@@ -50,7 +50,7 @@ jobs:
       - name: Deploy (third try)
         id: d3
         if: steps.d1.outcome != 'success' && steps.d2.outcome != 'success'
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e  # v4.0.5
         continue-on-error: true
         with:
           timeout: 420000

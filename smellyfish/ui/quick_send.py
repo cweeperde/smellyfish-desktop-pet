@@ -1,4 +1,5 @@
 """A small window to send a letter or a visit to someone in your lobby without opening the lobby window."""
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout
 
@@ -17,9 +18,13 @@ class QuickSend(QDialog):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 12)
         root.setSpacing(8)
-        root.addWidget(theme.banner("Letter" if mode == "letter" else "Visit",
-                                    "Write to someone in the lobby" if mode == "letter" else "Drop by someone's desktop",
-                                    sprite.Pose(eyes="happy", arm_f=("rest_l", "up_r"))))
+        root.addWidget(
+            theme.banner(
+                "Letter" if mode == "letter" else "Visit",
+                "Write to someone in the lobby" if mode == "letter" else "Drop by someone's desktop",
+                sprite.Pose(eyes="happy", arm_f=("rest_l", "up_r")),
+            )
+        )
         body = QVBoxLayout()
         body.setContentsMargins(16, 4, 16, 0)
         body.setSpacing(8)
@@ -81,11 +86,23 @@ class QuickSend(QDialog):
                 return self.status.setText("Too many waiting messages, try again in a moment.")
             what = "Letter" if self.mode == "letter" else "Visit"
             secs = "".join(c for c in result if c.isdigit()) or "a few"
-            self.app.notice({"kind": "wait", "chip": "Lobby", "text": f"{what} is queued and goes out in "
-                             f"about {secs} s (cooldown)."}, seconds=5)
+            self.app.notice(
+                {
+                    "kind": "wait",
+                    "chip": "Lobby",
+                    "text": f"{what} is queued and goes out in about {secs} s (cooldown).",
+                },
+                seconds=5,
+            )
             return self.accept()
         if result:
             return self.status.setText(result)
-        self.app.notice({"kind": "wait", "chip": "Lobby", "text": "Letter is on its way!" if self.mode == "letter"
-                         else "Off you go! Your jellyfish waves."}, seconds=4)
+        self.app.notice(
+            {
+                "kind": "wait",
+                "chip": "Lobby",
+                "text": "Letter is on its way!" if self.mode == "letter" else "Off you go! Your jellyfish waves.",
+            },
+            seconds=4,
+        )
         self.accept()
