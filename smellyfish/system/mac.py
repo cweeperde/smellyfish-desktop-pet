@@ -122,6 +122,10 @@ def float_window(widget):
     """Keep one of our windows above normal windows, on every Space and next to fullscreen apps."""
     if not IS_MAC or widget.property("sf_floating"):
         return
+    from PySide6.QtGui import QGuiApplication
+
+    if QGuiApplication.platformName() != "cocoa":
+        return
     try:
         import objc
 
