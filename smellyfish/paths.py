@@ -46,25 +46,73 @@ def pet_command():
 
 
 def ensure_relay():
-    """In the packaged app, unpack the small relay next to the settings (once per version)."""
+    """In the packaged app, unpack the small relay next to the settings (once per version).
+
+    A relay that is still running (a hook waiting for an answer, the statusline) keeps its files locked on
+    Windows, so a failure here is logged and retried on the next start instead of stopping the app."""
     if not FROZEN:
         return
+    try:
+        _unpack_relay()
+    except Exception:
+        import logging
+
+        logging.getLogger("smellyfish").exception("could not unpack the hook relay")
+
+
+def _unpack_relay():
     import shutil
     import zipfile
 
     src = os.path.join(BUNDLE_DIR, "relay.zip")
     stamp = os.path.join(RELAY_DIR, "version")
     size = str(os.path.getsize(src)) if os.path.exists(src) else ""
-    if os.path.exists(RELAY_EXE) and os.path.exists(stamp) and open(stamp).read() == size:
-        return
-    shutil.rmtree(RELAY_DIR, ignore_errors=True)
-    os.makedirs(RELAY_DIR, exist_ok=True)
-    with zipfile.ZipFile(src) as z:
-        z.extractall(RELAY_DIR)
-        if not sys.platform.startswith("win"):
-            for info in z.infolist():
-                mode = (info.external_attr >> 16) & 0o777
-                if mode:
-                    os.chmod(os.path.join(RELAY_DIR, info.filename), mode)
+    _remove_stale(RELAY_DIR)
+    if os.path.exists(RELAY_EXE) and os.path.exists(stamp):
+        with open(stamp) as f:
+            if f.read() == size:
+                return
+    new = RELAY_DIR + ".new"
+    shutil.rmtree(new, ignore_errors=True)
+    os.makedirs(new)
+    try:
+        with zipfile.ZipFile(src) as z:
+            z.extractall(new)
+            if not sys.platform.startswith("win"):
+                for info in z.infolist():
+                    mode = (info.external_attr >> 16) & 0o777
+                    if mode:
+                        os.chmod(os.path.join(new, info.filename), mode)
+        if os.path.exists(stamp):
+            os.remove(stamp)
+        for root, _dirs, files in os.walk(new):
+            dest_dir = os.path.join(RELAY_DIR, os.path.relpath(root, new))
+            os.makedirs(dest_dir, exist_ok=True)
+            for name in files:
+                _replace(os.path.join(root, name), os.path.join(dest_dir, name))
+    finally:
+        shutil.rmtree(new, ignore_errors=True)
     with open(stamp, "w") as f:
         f.write(size)
+
+
+def _replace(src, dest):
+    """Move src over dest. A running exe or DLL cannot be overwritten on Windows, but it can be renamed."""
+    try:
+        os.replace(src, dest)
+        return
+    except PermissionError:
+        if not os.path.exists(dest):
+            raise
+    os.replace(dest, f"{dest}.{os.getpid()}.stale")
+    os.replace(src, dest)
+
+
+def _remove_stale(folder):
+    for root, _dirs, files in os.walk(folder):
+        for name in files:
+            if name.endswith(".stale"):
+                try:
+                    os.remove(os.path.join(root, name))
+                except OSError:
+                    pass
