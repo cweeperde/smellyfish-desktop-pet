@@ -71,9 +71,11 @@ The jellyfish explains the basics and asks a few questions: Claude Code hooks, w
 2. Run it. It is a single portable file, there is nothing to install.
 3. Follow the short tour. Later, right-click the jellyfish or its tray icon for the menu and the settings.
 
-**macOS 13 or newer (Apple silicon and Intel)**
+**macOS 13 or newer (Apple silicon and Intel) – beta**
 
-1. Download [`Smellyfish.dmg`](https://github.com/cweeperde/smellyfish-desktop-pet/releases/latest/download/Smellyfish.dmg), open it and drag Smellyfish into Applications.
+The Mac version is still in beta: moving around and finding windows do not work everywhere yet, and it does not update itself.
+
+1. Download `Smellyfish.dmg` from the newest [pre-release](https://github.com/cweeperde/smellyfish-desktop-pet/releases), open it and drag Smellyfish into Applications.
 2. Start it from Applications. The app is not notarized by Apple, so the first start is blocked once: open System Settings > Privacy & Security and click Open Anyway.
 3. Follow the short tour. Smellyfish lives in the menu bar; it has no Dock icon.
 

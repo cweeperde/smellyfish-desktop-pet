@@ -8,13 +8,13 @@ KINDS = {"new": "New", "better": "Improved", "fix": "Fixed"}
 CHANGELOG = [
     {
         "version": "1.7.0",
-        "date": "2026-11-13",
-        "title": "Now on the Mac, more agents and new things to do",
+        "date": "2026-11-20",
+        "title": "More agents and new things to do",
         "items": [
             (
                 "new",
-                "Smellyfish runs on macOS 13 and newer (Apple silicon and Intel) and lives in the menu bar. Features "
-                "that need a macOS permission start off and ask when you switch them on.",
+                "A beta for macOS 13 and newer (Apple silicon and Intel) is in the pre-releases. On the Mac, "
+                "Smellyfish lives in the menu bar; features that need a macOS permission start off and ask first.",
             ),
             (
                 "new",
